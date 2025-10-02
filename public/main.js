@@ -1,9 +1,10 @@
 // main.js
-import * as THREE from "https://unpkg.com/three/build/three.module.js";
-import { OrbitControls } from "https://unpkg.com/three/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader } from "https://unpkg.com/three/examples/jsm/loaders/GLTFLoader.js";
-import { RGBELoader } from "https://unpkg.com/three/examples/jsm/loaders/RGBELoader.js";
-import { GLTFExporter } from "https://unpkg.com/three/examples/jsm/exporters/GLTFExporter.js";
+import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+import { RGBELoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/RGBELoader.js";
+import { GLTFExporter } from "https://unpkg.com/three@0.160.0/examples/jsm/exporters/GLTFExporter.js";
+
 const MUG_GLB_PATH = "./mug.glb";
 const HANDBAG_GLB_PATH = "./handbag.glb";
 const THERMOS_GLB_PATH = "./thermos.glb";
