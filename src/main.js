@@ -27,7 +27,7 @@ dir.position.set(3, 6, 3);
 scene.add(dir);
 // === Environment Map ===
 const rgbeLoader = new RGBELoader();
-rgbeLoader.load("./env/studio_small_03_1k.hdr", (hdrTex) => {
+rgbeLoader.load("/env/studio_small_03_1k.hdr", (hdrTex) => {
   hdrTex.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = hdrTex; // used for PBR reflections
   scene.environmentIntensity = 0.1;
