@@ -1,3 +1,4 @@
+// main.js
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -894,4 +895,148 @@ window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ------------------------------
+// NEW: export full texture canvas (2048) + Add-to-Cart upload flow
+// ------------------------------
+
+function getFinalTextureCanvas() {
+  if (!perMaterialBounds.size) return null;
+
+  // We'll return the first material's full canvas (typical: "outside")
+  let finalCanvas = null;
+  perMaterialBounds.forEach((info) => {
+    const { baseCanvas } = info;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = baseCanvas.width;
+    canvas.height = baseCanvas.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(baseCanvas, 0, 0);
+
+    // Vẽ tất cả các layer lên canvas base
+    for (const layer of imageLayers) {
+      const img = layer.img;
+      const tr = layer.transform;
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const imgAspect = img.width / img.height;
+      const targetAspect = w / h;
+
+      let drawW, drawH;
+      if (imgAspect > targetAspect) {
+        drawW = w;
+        drawH = w / imgAspect;
+      } else {
+        drawH = h;
+        drawW = h * imgAspect;
+      }
+
+      const drawX = (w - drawW) / 2 + tr.offsetX * w;
+      const drawY = (h - drawH) / 2 + tr.offsetY * h;
+
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(tr.rotation || 0);
+      ctx.scale(tr.scale || 1, tr.scale || 1);
+      ctx.translate(-w / 2, -h / 2);
+
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      ctx.restore();
+    }
+
+    finalCanvas = canvas;
+  });
+
+  return finalCanvas;
+}
+
+async function exportFinalPNG() {
+  const canvas = getFinalTextureCanvas();
+  if (!canvas) {
+    setStatus("⚠️ No texture canvas available.");
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
+// Add to Cart flow:
+// 1) exportFinalPNG() -> PNG blob
+// 2) POST to /api/upload (Vercel) -> returns { url }
+// 3) POST to /cart/add.js with properties including Custom Image URL
+const ADD_TO_CART_BTN = document.getElementById("addToCartBtn");
+
+// TODO: REPLACE with real Shopify variant id
+const SHOPIFY_VARIANT_ID = 9999740371227;
+
+ADD_TO_CART_BTN.addEventListener("click", async () => {
+  try {
+    setStatus("Preparing image...");
+    const blob = await exportFinalPNG();
+    if (!blob) {
+      alert("Chưa có texture để upload.");
+      return;
+    }
+
+    setStatus("Uploading image to server...");
+    const form = new FormData();
+    form.append("file", blob, "design.png");
+
+    // NOTE: change to your Vercel domain or backend URL
+    const uploadRes = await fetch("/api/upload", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!uploadRes.ok) {
+      const text = await uploadRes.text();
+      console.error("Upload failed:", text);
+      setStatus("❌ Upload failed");
+      return;
+    }
+
+    const { url } = await uploadRes.json();
+    if (!url) {
+      setStatus("❌ Bad upload response");
+      return;
+    }
+
+    setStatus("Adding item to cart...");
+    // add to cart via Shopify's AJAX API
+    const addRes = await fetch("/cart/add.js", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: [
+          {
+            id: SHOPIFY_VARIANT_ID,
+            quantity: 1,
+            properties: {
+              "Custom Image URL": url,
+            },
+          },
+        ],
+      }),
+    });
+
+    if (!addRes.ok) {
+      const err = await addRes.text();
+      console.error("Add to cart failed:", err);
+      setStatus("❌ Add to cart failed");
+      return;
+    }
+
+    setStatus("✅ Added to cart. Redirecting to /cart ...");
+    window.location.href = "/cart";
+  } catch (e) {
+    console.error(e);
+    setStatus("❌ Error: " + e.message);
+  }
 });
