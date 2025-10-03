@@ -862,6 +862,9 @@ function loadGLBFromURL(urlOrFile) {
     loadedModel.traverse((child) => {
       if (child.isMesh && child.material) {
         originalMaterials.set(child.uuid, child.material.clone());
+        child.material.envMap = scene.environment;
+        child.material.envMapIntensity = 0.1; // 👈 kiểm soát trực tiếp ở material
+        child.material.needsUpdate = true;
       }
     });
 
