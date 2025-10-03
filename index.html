@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Interactive Mug Texture Editor</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --primary: 221.2 83.2% 53.3%;
+        --primary-foreground: 210 40% 98%;
+        --secondary: 210 40% 96.1%;
+        --secondary-foreground: 222.2 47.4% 11.2%;
+        --border: 214.3 31.8% 91.4%;
+        --radius: 0.65rem;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Dashboard absolute overlay */
+      #sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 320px;
+        height: 100vh;
+        overflow-y: auto;
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+        border-right: 1px solid hsl(var(--border));
+        padding: 18px;
+        box-sizing: border-box;
+        z-index: 20;
+        backdrop-filter: blur(4px);
+      }
+
+      #canvas-wrap {
+        width: 100%;
+        height: 100vh;
+      }
+
+      h3 {
+        margin-top: 14px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: hsl(var(--foreground));
+      }
+
+      button {
+        width: 100%;
+        padding: 9px 10px;
+        margin: 6px 0;
+        border-radius: var(--radius);
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--secondary));
+        color: hsl(var(--foreground));
+        cursor: pointer;
+        transition: background 0.18s, transform 0.08s;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      button:hover {
+        background: hsl(var(--primary) / 0.08);
+      }
+      button:active {
+        transform: scale(0.99);
+      }
+      button.primary {
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
+      }
+
+      .control-group {
+        margin-top: 8px;
+      }
+      label {
+        font-size: 13px;
+        display: block;
+        margin-bottom: 6px;
+        color: hsl(var(--muted-foreground));
+      }
+
+      /* Modern range sliders */
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 7px;
+        border-radius: 999px;
+        background: hsl(var(--border));
+        outline: none;
+        transition: background 0.12s;
+      }
+      input[type="range"]:hover {
+        background: hsl(var(--primary) / 0.35);
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: hsl(var(--primary));
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        cursor: pointer;
+        transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.2, 1);
+      }
+      input[type="range"]::-webkit-slider-thumb:active {
+        transform: scale(1.45);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: hsl(var(--primary));
+        cursor: pointer;
+      }
+      input[type="range"]::-moz-range-thumb:active {
+        transform: scale(1.45);
+      }
+
+      #status {
+        margin-top: 8px;
+        font-size: 13px;
+        color: hsl(var(--muted-foreground));
+      }
+
+      /* image list items */
+      #imageList .image-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .image-item {
+        padding: 8px;
+        background: #fff;
+        border-radius: 6px;
+        border: 1px solid #e7e7e7;
+      }
+      .image-item.dragging {
+        opacity: 0.6;
+        background: #f9fbff;
+      }
+      .image-item .layer-name {
+        border: none;
+        background: transparent;
+        width: 100%;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="sidebar">
+      <h3>Models</h3>
+      <button id="mugBtn">Mug Model</button>
+      <button id="handbagBtn">Handbag Model</button>
+      <button id="thermosBtn">Thermos Model</button>
+
+      <h3>Image texture</h3>
+      <input type="file" id="imgInput" accept="image/*" />
+      <div id="imageList"></div>
+
+      <h3>Customize</h3>
+      <div class="control-group">
+        <label for="offsetX">Horizontal</label>
+        <input type="range" id="offsetX" min="-5" max="5" step="0.01" value="0" />
+        <label for="offsetY">Vertical</label>
+        <input type="range" id="offsetY" min="-5" max="5" step="0.01" value="0" />
+        <label for="scale">Scale</label>
+        <input type="range" id="scale" min="0.1" max="3" step="0.01" value="1" />
+        <label for="rotation">Rotation</label>
+        <input type="range" id="rotation" min="-360" max="360" step="1" value="0" />
+      </div>
+
+      <h3>Order</h3>
+      <!-- Replace VARIANT_ID with actual Shopify product variant id -->
+      <button id="addToCartBtn" class="primary">Add to Cart (with design)</button>
+
+      <h3>Export / Admin</h3>
+      <button id="exportBtn">Export Model (.glb)</button>
+      <button id="exportPngBtn">Export View (.png)</button>
+      <button id="exportTextureBtn">Export Full Model Texture (.png)</button>
+      <button id="exportTextureCutBtn">Export Texture Cut (.png)</button>
+
+      <div id="status">Status: ready</div>
+    </div>
+
+    <div id="canvas-wrap"></div>
+
+    <script type="module" src="/src/public/main.js  "></script>
+  </body>
+</html>
