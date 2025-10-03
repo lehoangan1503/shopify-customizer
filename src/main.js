@@ -27,12 +27,22 @@ dir.position.set(3, 6, 3);
 scene.add(dir);
 // === Environment Map ===
 const rgbeLoader = new RGBELoader();
-rgbeLoader.load("/env/studio_small_03_1k.hdr", (hdrTex) => {
-  hdrTex.mapping = THREE.EquirectangularReflectionMapping;
-  scene.environment = hdrTex; // used for PBR reflections
-  scene.environmentIntensity = 0.1;
-  scene.background = new THREE.Color(0xf2f4f8); // keep flat bg instead of showing HDR image
-});
+rgbeLoader.load(
+  "/env/studio_small_03_1k.hdr",
+  (hdrTex) => {
+    console.log("✅ HDR loaded:", hdrTex);
+    hdrTex.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = hdrTex; // dùng cho PBR reflections
+    scene.environmentIntensity = 0.1;
+    scene.background = new THREE.Color(0xf2f4f8);
+  },
+  (xhr) => {
+    console.log(`HDR loading... ${((xhr.loaded / xhr.total) * 100).toFixed(2)}%`);
+  },
+  (error) => {
+    console.error("❌ Failed to load HDR:", error);
+  }
+);
 // orbit controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
