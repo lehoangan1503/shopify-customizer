@@ -70,10 +70,11 @@ function setStatus(s) {
 }
 
 // ===== HELPERS =====
-function exportTextureCut() {
+//
+async function exportTextureCut() {
   if (!loadedModel) {
     setStatus("⚠️ No model loaded.");
-    return;
+    return null;
   }
 
   // Step 1: regenerate composited texture
@@ -122,10 +123,10 @@ function exportTextureCut() {
 
   if (!fullCanvas) {
     setStatus("⚠️ No final composited texture.");
-    return;
+    return null;
   }
 
-  // Step 2: get UV bounds only for "outside" material
+  // Step 2: find UV bounds for "outside"
   let minU = Infinity,
     minV = Infinity,
     maxU = -Infinity,
@@ -133,12 +134,10 @@ function exportTextureCut() {
 
   loadedModel.traverse((child) => {
     if (!child.isMesh) return;
-
     const mats = Array.isArray(child.material) ? child.material : [child.material];
     mats.forEach((mat) => {
       const name = (mat?.name || "").toLowerCase();
-      if (!name.includes("outside")) return; // only "outside" material
-
+      if (!name.includes("outside")) return;
       const geom = child.geometry;
       if (!geom?.attributes?.uv) return;
       const uv = geom.attributes.uv;
@@ -156,7 +155,7 @@ function exportTextureCut() {
 
   if (minU === Infinity) {
     setStatus("⚠️ No 'outside' UVs found.");
-    return;
+    return null;
   }
 
   const cutX = minU * fullCanvas.width;
@@ -171,18 +170,10 @@ function exportTextureCut() {
   const cutCtx = cutCanvas.getContext("2d");
   cutCtx.drawImage(fullCanvas, cutX, cutY, cutW, cutH, 0, 0, cutW, cutH);
 
-  // Step 4: export
-  cutCanvas.toBlob((blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "custom_texture_cut.png";
-    a.click();
-    URL.revokeObjectURL(url);
-
-    setStatus("✅ Exported custom_texture_cut.png (outside only)");
-  });
+  // ✅ Step 4: return the result canvas
+  return cutCanvas;
 }
+
 function exportTexture() {
   if (!perMaterialBounds.size) {
     setStatus("⚠️ No texture to export.");
