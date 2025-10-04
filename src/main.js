@@ -908,3 +908,51 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+// ------------------------------
+// NEW: export full texture canvas (2048) + Add-to-Cart upload flow
+// ------------------------------
+
+async function orderNow() {
+  try {
+    setStatus("Preparing outside texture...");
+    const cutCanvas = await exportTextureCut();
+    if (!cutCanvas) return alert("⚠️ Không thể xuất hình ngoài.");
+
+    // convert canvas to blob
+    const blob = await new Promise((r) => cutCanvas.toBlob(r, "image/png"));
+    const formData = new FormData();
+    formData.append("file", blob, "design.png");
+
+    // Upload to Cloudinary
+    setStatus("Uploading design...");
+    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+    const { url } = await uploadRes.json();
+    if (!url) throw new Error("Upload failed");
+
+    // Add to Shopify cart
+    setStatus("Adding to cart...");
+    const addRes = await fetch("/api/add-to-cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: 9999740371227, // 🧩 Replace with your real variant ID
+        quantity: 1,
+        properties: { "Custom Design URL": url },
+      }),
+    });
+
+    if (!addRes.ok) {
+      const err = await addRes.text();
+      console.error("Add to cart failed:", err);
+      throw new Error("Add to cart failed");
+    }
+
+    setStatus("✅ Added to cart. Redirecting...");
+    window.location.href = `https://${process.env.SHOPIFY_STORE_DOMAIN}/cart`;
+  } catch (e) {
+    console.error(e);
+    setStatus("❌ Error: " + e.message);
+  }
+}
+
+document.getElementById("orderNowBtn").addEventListener("click", orderNow);
