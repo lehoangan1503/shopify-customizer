@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const { id, quantity, properties } = req.body;
 
     // Proxy sang Shopify store frontend API
-    const resp = await fetch(`https://${process.env.SHOPIFY_STORE_DOMAIN}/cart/add.js`, {
+    const resp = await fetch(`https://${process.env.VITE_SHOPIFY_STORE_DOMAIN}/cart/add.js`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items: [{ id, quantity, properties }] }),
