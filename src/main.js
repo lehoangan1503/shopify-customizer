@@ -919,7 +919,7 @@ async function orderNow() {
     const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
     const { url } = await uploadRes.json();
     if (!url) throw new Error("Upload failed");
-
+    console.log(`url: ${url}`);
     // Add to Shopify cart
     setStatus("Adding to cart...");
     const addRes = await fetch("/api/add-to-cart", {
