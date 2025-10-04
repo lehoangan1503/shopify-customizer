@@ -830,10 +830,10 @@ document.getElementById("thermosBtn").addEventListener("click", () => {
   resetLayers();
   loadGLBFromURL(THERMOS_GLB_PATH);
 });
-document.getElementById("exportBtn").addEventListener("click", exportGLB);
-document.getElementById("exportPngBtn").addEventListener("click", exportPNG);
-document.getElementById("exportTextureBtn").addEventListener("click", exportTexture);
-document.getElementById("exportTextureCutBtn").addEventListener("click", exportTextureCut);
+// document.getElementById("exportBtn").addEventListener("click", exportGLB);
+// document.getElementById("exportPngBtn").addEventListener("click", exportPNG);
+// document.getElementById("exportTextureBtn").addEventListener("click", exportTexture);
+// document.getElementById("exportTextureCutBtn").addEventListener("click", exportTextureCut);
 
 // ===== MODEL LOADER =====
 const gltfLoader = new GLTFLoader();
