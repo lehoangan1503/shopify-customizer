@@ -939,7 +939,7 @@ async function orderNow() {
     }
 
     setStatus("✅ Added to cart. Redirecting...");
-    window.location.href = `https://${process.env.VITE_SHOPIFY_STORE_DOMAIN}/cart`;
+    window.location.href = `https://giftself-2.myshopify.com/cart`;
   } catch (e) {
     console.error(e);
     setStatus("❌ Error: " + e.message);
