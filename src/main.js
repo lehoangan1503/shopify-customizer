@@ -905,43 +905,67 @@ window.addEventListener("resize", () => {
 
 async function orderNow() {
   try {
-    setStatus("Preparing outside texture...");
+    setStatus("🧩 Preparing outside texture...");
     const cutCanvas = await exportTextureCut();
-    if (!cutCanvas) return alert("⚠️ Không thể xuất hình ngoài.");
+    if (!cutCanvas) {
+      alert("⚠️ Không thể xuất hình ngoài.");
+      return;
+    }
 
-    // convert canvas to blob
+    // Convert canvas → blob
     const blob = await new Promise((r) => cutCanvas.toBlob(r, "image/png"));
     const formData = new FormData();
     formData.append("file", blob, "design.png");
 
-    // Upload to Cloudinary
-    setStatus("Uploading design...");
+    // 🖼 Upload Cloudinary qua Vercel backend
+    setStatus("☁️ Uploading design...");
     const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      throw new Error("Upload failed: " + errText);
+    }
+
     const { url } = await uploadRes.json();
-    if (!url) throw new Error("Upload failed");
-    console.log(`url: ${url}`);
-    // Add to Shopify cart
-    setStatus("Adding to cart...");
-    const addRes = await fetch("/api/add-to-cart", {
+    if (!url) throw new Error("Upload failed: No URL returned");
+
+    console.log("✅ Uploaded:", url);
+
+    // 🛒 Add to Shopify cart
+    setStatus("🛍 Adding to cart...");
+
+    const addRes = await fetch("https://giftself-2.myshopify.com/cart/add.js", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include", // keep Shopify cart session
       body: JSON.stringify({
-        id: 9999740371227, // 🧩 Replace with your real variant ID
-        quantity: 1,
-        properties: { "Custom Design URL": url },
+        items: [
+          {
+            id: 9999740371227, // 🧩 Replace with your real variant ID
+            quantity: 1,
+            properties: { "Custom Design URL": url },
+          },
+        ],
       }),
     });
 
+    // 🔍 Handle possible Shopify error
     if (!addRes.ok) {
-      const err = await addRes.text();
-      console.error("Add to cart failed:", err);
-      throw new Error("Add to cart failed");
+      const errText = await addRes.text();
+      console.error("❌ Add to cart failed:", errText);
+      alert("Không thể thêm vào giỏ hàng:\n\n" + errText);
+      setStatus("❌ Add to cart failed");
+      return;
     }
 
-    setStatus("✅ Added to cart. Redirecting...");
-    window.location.href = `https://giftself-2.myshopify.com/cart`;
+    const data = await addRes.json();
+    console.log("🛒 Shopify added item:", data);
+
+    // ✅ Success
+    setStatus("✅ Added to cart. Redirecting to Shopify...");
+    window.location.href = "https://giftself-2.myshopify.com/cart";
   } catch (e) {
-    console.error(e);
+    console.error("⚠️ Order error:", e);
+    alert("Lỗi khi xử lý đơn hàng:\n" + e.message);
     setStatus("❌ Error: " + e.message);
   }
 }
