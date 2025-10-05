@@ -174,7 +174,7 @@ async function exportTextureCut() {
   return cutCanvas;
 }
 
-function exportTexture() {
+async function exportTexture() {
   if (!perMaterialBounds.size) {
     setStatus("⚠️ No texture to export.");
     return;
@@ -233,17 +233,17 @@ function exportTexture() {
     setStatus("⚠️ No final canvas available.");
     return;
   }
+  return finalCanvas;
+  // finalCanvas.toBlob((blob) => {
+  //   const url = URL.createObjectURL(blob);
+  //   const a = document.createElement("a");
+  //   a.href = url;
+  //   a.download = "custom_texture.png";
+  //   a.click();
+  //   URL.revokeObjectURL(url);
 
-  finalCanvas.toBlob((blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "custom_texture.png";
-    a.click();
-    URL.revokeObjectURL(url);
-
-    setStatus("✅ Exported custom_texture.png with transforms");
-  });
+  //   setStatus("✅ Exported custom_texture.png with transforms");
+  // });
 }
 
 async function prepareTexturesForExport(object) {
@@ -906,7 +906,7 @@ window.addEventListener("resize", () => {
 async function orderNow() {
   try {
     setStatus("🧩 Preparing outside texture...");
-    const cutCanvas = await exportTextureCut();
+    const cutCanvas = await exportTexture();
     if (!cutCanvas) {
       alert("⚠️ Không thể xuất hình ngoài.");
       return;
