@@ -930,39 +930,24 @@ async function orderNow() {
 
     console.log("✅ Uploaded:", url);
 
-    // 🛒 Add to Shopify cart
-    setStatus("🛍 Adding to cart...");
+    // 🧠 Instead of calling Shopify from iframe (blocked by CORS),
+    // we send message to parent Shopify page
+    setStatus("📨 Sending add-to-cart request to Shopify...");
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get("variant");
+    window.parent.postMessage(
+      {
+        type: "ADD_TO_CART",
+        payload: {
+          id: productId,
+          quantity: 1,
+          properties: { "Custom Design URL": url },
+        },
+      },
+      "*"
+    );
 
-    const addRes = await fetch("https://giftself-2.myshopify.com/cart/add.js", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include", // keep Shopify cart session
-      body: JSON.stringify({
-        items: [
-          {
-            id: 9999740371227, // 🧩 Replace with your real variant ID
-            quantity: 1,
-            properties: { "Custom Design URL": url },
-          },
-        ],
-      }),
-    });
-
-    // 🔍 Handle possible Shopify error
-    if (!addRes.ok) {
-      const errText = await addRes.text();
-      console.error("❌ Add to cart failed:", errText);
-      alert("Không thể thêm vào giỏ hàng:\n\n" + errText);
-      setStatus("❌ Add to cart failed");
-      return;
-    }
-
-    const data = await addRes.json();
-    console.log("🛒 Shopify added item:", data);
-
-    // ✅ Success
-    setStatus("✅ Added to cart. Redirecting to Shopify...");
-    window.location.href = "https://giftself-2.myshopify.com/cart";
+    setStatus("✅ Request sent to Shopify parent.");
   } catch (e) {
     console.error("⚠️ Order error:", e);
     alert("Lỗi khi xử lý đơn hàng:\n" + e.message);
