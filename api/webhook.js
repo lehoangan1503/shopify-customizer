@@ -53,8 +53,8 @@ export default async function handler(req, res) {
           props = item.properties || {};
         }
 
-        if (props["Custom Image URL"]) {
-          orderObject.designUrl = props["Custom Image URL"];
+        if (props["Custom Design URL"]) {
+          orderObject.designUrl = props["Custom Design URL"];
           break; // stop after first found
         }
       }
