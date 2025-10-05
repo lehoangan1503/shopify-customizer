@@ -18,7 +18,6 @@ function verifyShopifyWebhook(req, secret) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
-  // get raw body buffer
   try {
     const raw = await getRawBody(req);
     req.rawBody = raw;
@@ -27,7 +26,6 @@ export default async function handler(req, res) {
     return res.status(400).send("Bad request");
   }
 
-  // verify signature (optional but recommended)
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
   if (secret && !verifyShopifyWebhook(req, secret)) {
     console.warn("Webhook signature invalid");
@@ -38,13 +36,14 @@ export default async function handler(req, res) {
     const jsonStr = req.rawBody.toString("utf8");
     const payload = JSON.parse(jsonStr);
 
-    console.log("Got order webhook:", payload.id);
+    const orderObject = {
+      orderId: payload.id || payload.admin_graphql_api_id || null,
+      designUrl: null,
+    };
+
     // process line items
     for (const item of payload.line_items || []) {
       if (item.properties) {
-        // properties is an array of {name,value} in webhook payload or object?
-        // Shopify webhook may return properties as array of {name,value}
-        // unify:
         let props = {};
         if (Array.isArray(item.properties)) {
           item.properties.forEach((p) => {
@@ -55,15 +54,22 @@ export default async function handler(req, res) {
         }
 
         if (props["Custom Image URL"]) {
-          console.log("Custom Image URL:", props["Custom Image URL"]);
-          // => here you can save to DB, queue print job, call another service, etc.
+          orderObject.designUrl = props["Custom Image URL"];
+          break; // stop after first found
         }
       }
     }
 
-    res.status(200).send("ok");
+    console.log("Got order webhook:", orderObject);
+
+    // return structured response
+    return res.status(200).json({
+      success: true,
+      message: "Order webhook received",
+      data: orderObject,
+    });
   } catch (e) {
     console.error("Webhook handler error", e);
-    res.status(500).send("Server error");
+    return res.status(500).send("Server error");
   }
 }
