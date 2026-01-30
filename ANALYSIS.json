@@ -1,0 +1,302 @@
+{
+  "modelPath": "./public/cue-butt.glb",
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodeCount": 3
+    }
+  ],
+  "meshes": [
+    {
+      "meshName": "Cone.048",
+      "primitiveIndex": 0,
+      "materialName": "Mat_Body",
+      "vertexCount": 16007,
+      "indexCount": 76020,
+      "hasUV": true,
+      "uvBounds": {
+        "minU": 0,
+        "maxU": 1,
+        "minV": 0.497964,
+        "maxV": 0.99,
+        "width": 1,
+        "height": 0.492036,
+        "vertexCount": 16007
+      },
+      "attributes": [
+        {
+          "semantic": "POSITION",
+          "count": 16007,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "NORMAL",
+          "count": 16007,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "TEXCOORD_0",
+          "count": 16007,
+          "type": "VEC2"
+        }
+      ]
+    },
+    {
+      "meshName": "Cone.048",
+      "primitiveIndex": 1,
+      "materialName": "outside",
+      "vertexCount": 20935,
+      "indexCount": 92928,
+      "hasUV": true,
+      "uvBounds": {
+        "minU": 0,
+        "maxU": 1,
+        "minV": 0,
+        "maxV": 0.497964,
+        "width": 1,
+        "height": 0.497964,
+        "vertexCount": 20935
+      },
+      "attributes": [
+        {
+          "semantic": "POSITION",
+          "count": 20935,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "NORMAL",
+          "count": 20935,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "TEXCOORD_0",
+          "count": 20935,
+          "type": "VEC2"
+        }
+      ]
+    },
+    {
+      "meshName": "Cone.051",
+      "primitiveIndex": 0,
+      "materialName": "Mat_JointCover",
+      "vertexCount": 10175,
+      "indexCount": 41412,
+      "hasUV": true,
+      "uvBounds": {
+        "minU": 0,
+        "maxU": 1,
+        "minV": 0,
+        "maxV": 1,
+        "width": 1,
+        "height": 1,
+        "vertexCount": 10175
+      },
+      "attributes": [
+        {
+          "semantic": "POSITION",
+          "count": 10175,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "NORMAL",
+          "count": 10175,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "TEXCOORD_0",
+          "count": 10175,
+          "type": "VEC2"
+        }
+      ]
+    },
+    {
+      "meshName": "Cylinder.050",
+      "primitiveIndex": 0,
+      "materialName": "Mat_Bumper",
+      "vertexCount": 1285,
+      "indexCount": 6132,
+      "hasUV": true,
+      "uvBounds": {
+        "minU": 0,
+        "maxU": 1,
+        "minV": 0.25,
+        "maxV": 0.989993,
+        "width": 1,
+        "height": 0.739993,
+        "vertexCount": 1285
+      },
+      "attributes": [
+        {
+          "semantic": "POSITION",
+          "count": 1285,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "NORMAL",
+          "count": 1285,
+          "type": "VEC3"
+        },
+        {
+          "semantic": "TEXCOORD_0",
+          "count": 1285,
+          "type": "VEC2"
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "Mat_Body",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorFactor": [
+        0.699999988079071,
+        0.699999988079071,
+        0.699999988079071,
+        1
+      ],
+      "hasBaseColorTexture": false,
+      "baseColorTexture": null,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.44999998807907104,
+      "normalTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "outside",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorFactor": [
+        0.800000011920929,
+        0.800000011920929,
+        0.800000011920929,
+        1
+      ],
+      "hasBaseColorTexture": false,
+      "baseColorTexture": null,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.5,
+      "normalTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Mat_JointCover",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorFactor": [
+        0.029999999329447746,
+        0.029999999329447746,
+        0.029999999329447746,
+        1
+      ],
+      "hasBaseColorTexture": false,
+      "baseColorTexture": null,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.44999998807907104,
+      "normalTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Mat_Bumper",
+      "alphaMode": "OPAQUE",
+      "doubleSided": true,
+      "baseColorFactor": [
+        0.05999999865889549,
+        0.05999999865889549,
+        0.05999999865889549,
+        1
+      ],
+      "hasBaseColorTexture": false,
+      "baseColorTexture": null,
+      "metallicFactor": 0,
+      "roughnessFactor": 0.44999998807907104,
+      "normalTexture": null,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "textures": [],
+  "nodeHierarchy": [
+    {
+      "name": "AI_CUE_butt_body",
+      "hasMesh": true,
+      "meshName": "Cone.048",
+      "translation": [
+        0,
+        0.3682999908924103,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "childCount": 0
+    },
+    {
+      "name": "AI_CUE_joint_cover",
+      "hasMesh": true,
+      "meshName": "Cone.051",
+      "translation": [
+        0,
+        0.775350034236908,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "childCount": 0
+    },
+    {
+      "name": "AI_CUE_bumper",
+      "hasMesh": true,
+      "meshName": "Cylinder.050",
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "childCount": 0
+    }
+  ]
+}

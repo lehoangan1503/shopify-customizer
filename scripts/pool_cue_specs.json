@@ -1,0 +1,232 @@
+{
+  "model_name": "pool_cue",
+  "export_format": "glb",
+  "export_path": "../public/cue.glb",
+  "total_length_mm": 1435,
+  "orientation": {
+    "axis": "Y",
+    "tip_direction": "+Y",
+    "center_at_origin": true
+  },
+  "segments": [
+    {
+      "name": "tip",
+      "order": 1,
+      "description": "Leather tip - striking surface",
+      "length_mm": 5,
+      "diameter_start_mm": 12,
+      "diameter_end_mm": 12,
+      "shape": "cylinder_rounded_top",
+      "material": {
+        "name": "tip_leather",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#3D2314",
+        "roughness": 0.85,
+        "metallic": 0.0,
+        "subsurface": 0.1
+      },
+      "subdivisions": 16,
+      "notes": "Dome/hemisphere on top for realistic tip shape"
+    },
+    {
+      "name": "ferrule",
+      "order": 2,
+      "description": "Protective plastic collar below tip",
+      "length_mm": 25,
+      "diameter_start_mm": 12,
+      "diameter_end_mm": 12.5,
+      "shape": "cylinder",
+      "material": {
+        "name": "ferrule_plastic",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#FFFEF0",
+        "roughness": 0.25,
+        "metallic": 0.0,
+        "specular": 0.5
+      },
+      "subdivisions": 24,
+      "notes": "Ivory/off-white color, smooth plastic appearance"
+    },
+    {
+      "name": "shaft",
+      "order": 3,
+      "description": "Main playing shaft - maple wood with taper",
+      "length_mm": 730,
+      "diameter_start_mm": 12.5,
+      "diameter_end_mm": 14,
+      "shape": "tapered_cylinder",
+      "material": {
+        "name": "shaft_maple",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#E8D4B8",
+        "roughness": 0.45,
+        "metallic": 0.0,
+        "subsurface": 0.05
+      },
+      "subdivisions": 32,
+      "notes": "Gradual taper from tip toward joint, natural maple grain"
+    },
+    {
+      "name": "joint_collar",
+      "order": 4,
+      "description": "Metal joint ring connecting shaft to butt",
+      "length_mm": 15,
+      "diameter_start_mm": 14,
+      "diameter_end_mm": 14,
+      "shape": "cylinder",
+      "material": {
+        "name": "joint_brass",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#B5A642",
+        "roughness": 0.2,
+        "metallic": 0.95,
+        "specular": 0.8
+      },
+      "subdivisions": 32,
+      "notes": "Polished brass/gold appearance with metallic sheen"
+    },
+    {
+      "name": "forearm",
+      "order": 5,
+      "description": "Decorative wood section with taper",
+      "length_mm": 200,
+      "diameter_start_mm": 14,
+      "diameter_end_mm": 20,
+      "shape": "tapered_cylinder",
+      "material": {
+        "name": "forearm_wood",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#8B4513",
+        "roughness": 0.4,
+        "metallic": 0.0,
+        "subsurface": 0.05
+      },
+      "subdivisions": 32,
+      "notes": "Darker decorative wood, gradual taper to grip"
+    },
+    {
+      "name": "wrap",
+      "order": 6,
+      "description": "CUSTOM LAYER AREA - Grip wrap for texture customization",
+      "length_mm": 300,
+      "diameter_start_mm": 20,
+      "diameter_end_mm": 24,
+      "shape": "tapered_cylinder",
+      "material": {
+        "name": "outside",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#1A1A1A",
+        "roughness": 0.6,
+        "metallic": 0.0
+      },
+      "subdivisions": 48,
+      "uv_mapping": {
+        "type": "cylindrical",
+        "seam_angle_deg": 180,
+        "u_range": [0.0, 1.0],
+        "v_range": [0.0, 1.0],
+        "notes": "Full UV unwrap for custom texture application"
+      },
+      "is_customizable": true,
+      "notes": "PRIMARY CUSTOMIZATION ZONE - Material named 'outside' for Three.js targeting. This is the grip area where users apply custom designs."
+    },
+    {
+      "name": "butt_sleeve",
+      "order": 7,
+      "description": "Decorative butt sleeve with taper",
+      "length_mm": 150,
+      "diameter_start_mm": 24,
+      "diameter_end_mm": 28,
+      "shape": "tapered_cylinder",
+      "material": {
+        "name": "butt_wood",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#2F1810",
+        "roughness": 0.35,
+        "metallic": 0.0,
+        "subsurface": 0.05
+      },
+      "subdivisions": 32,
+      "notes": "Dark hardwood, ebony-like appearance"
+    },
+    {
+      "name": "bumper",
+      "order": 8,
+      "description": "Rubber end cap for protection",
+      "length_mm": 10,
+      "diameter_start_mm": 28,
+      "diameter_end_mm": 29,
+      "shape": "cylinder_rounded_bottom",
+      "material": {
+        "name": "bumper_rubber",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#0A0A0A",
+        "roughness": 0.9,
+        "metallic": 0.0
+      },
+      "subdivisions": 24,
+      "notes": "Black rubber with matte finish, slight dome on bottom"
+    }
+  ],
+  "decorative_rings": [
+    {
+      "name": "ring_1",
+      "position_after_segment": "forearm",
+      "offset_mm": -5,
+      "length_mm": 3,
+      "diameter_mm": 20.5,
+      "material": {
+        "name": "ring_gold",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#D4AF37",
+        "roughness": 0.15,
+        "metallic": 0.95
+      }
+    },
+    {
+      "name": "ring_2",
+      "position_after_segment": "wrap",
+      "offset_mm": 5,
+      "length_mm": 3,
+      "diameter_mm": 24.5,
+      "material": {
+        "name": "ring_gold",
+        "type": "PRINCIPLED_BSDF",
+        "base_color_hex": "#D4AF37",
+        "roughness": 0.15,
+        "metallic": 0.95
+      }
+    }
+  ],
+  "scaling": {
+    "blender_units": "millimeters",
+    "export_scale": 0.001,
+    "notes": "Export at 0.001 scale to convert mm to meters for Three.js"
+  },
+  "export_settings": {
+    "format": "GLB",
+    "apply_modifiers": true,
+    "export_materials": true,
+    "export_colors": true,
+    "use_draco_compression": false,
+    "notes": "GLB binary format for web delivery"
+  },
+  "three_js_integration": {
+    "customizable_material_name": "outside",
+    "material_detection_logic": "name.toLowerCase().includes('outside')",
+    "expected_uv_bounds": {
+      "u_min": 0.0,
+      "u_max": 1.0,
+      "v_min": 0.0,
+      "v_max": 1.0
+    },
+    "notes": "Material named 'outside' will be detected by main.js for texture customization"
+  },
+  "segment_summary": {
+    "total_calculated_length_mm": 1435,
+    "tip_to_joint_mm": 775,
+    "joint_to_bumper_mm": 675,
+    "customizable_zone_percentage": 20.4,
+    "customizable_zone_position": "Lower 50% of butt section"
+  }
+}

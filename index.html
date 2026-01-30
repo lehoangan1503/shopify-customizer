@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Interactive Mug Texture Editor</title>
+    <title>Interactive Cue Texture Editor</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
       :root {
@@ -157,22 +157,57 @@
         width: 100%;
         font-size: 13px;
       }
+
+      /* Disabled surface layer styling */
+      .image-item.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+        background: #f5f5f5;
+      }
+      .image-item.disabled .layer-name {
+        color: #999;
+      }
+      .image-item.disabled input[type="radio"] {
+        pointer-events: none;
+      }
+      .image-item.disabled button {
+        display: none;
+      }
+
+      /* Selected/focused layer styling */
+      .image-item.selected {
+        border-color: #22c55e;
+        background: #f0fdf4;
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+      }
+
+      /* Edit frame overlay */
+      #editOverlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+        /* Ensure the overlay doesn't interfere with underlying canvas when not active */
+        touch-action: none;
+      }
+      #editOverlay.active {
+        /* pointer-events managed dynamically by JS for pass-through behavior */
+        pointer-events: auto;
+      }
     </style>
   </head>
 
   <body>
     <div id="sidebar">
-      <h3>Models</h3>
-      <button id="mugBtn">Mug Model</button>
-      <button id="handbagBtn">Handbag Model</button>
-      <button id="thermosBtn">Thermos Model</button>
-
       <h3>Image texture</h3>
       <input type="file" id="imgInput" accept="image/*" />
       <div id="imageList"></div>
 
       <h3>Customize</h3>
-      <div class="control-group">
+      <div class="control-group" id="sliderControls" style="display: none;">
         <label for="offsetX">Horizontal</label>
         <input type="range" id="offsetX" min="-5" max="5" step="0.01" value="0" />
         <label for="offsetY">Vertical</label>
@@ -182,6 +217,7 @@
         <label for="rotation">Rotation</label>
         <input type="range" id="rotation" min="-360" max="360" step="1" value="0" />
       </div>
+      <p id="customizeHint" style="font-size: 12px; color: #888; margin-top: 8px;">Select a custom layer to edit it directly on the 3D view.</p>
 
       <h3>Order</h3>
       <button id="orderNowBtn" class="primary">Order Now</button>
@@ -194,7 +230,9 @@
       <div id="status">Status: ready</div>
     </div>
 
-    <div id="canvas-wrap"></div>
+    <div id="canvas-wrap">
+      <canvas id="editOverlay"></canvas>
+    </div>
 
     <script type="module" src="/src/main.js"></script>
   </body>
