@@ -1391,123 +1391,6 @@ function makeDirectHandler(toRadians = false) {
   };
 }
 
-/**
- * Get UV bounds for the active material (first "outside" material)
- * @returns {{ minU: number, minV: number, maxU: number, maxV: number, width: number, height: number, rectW: number, rectH: number, origTexWidth: number, origTexHeight: number } | null}
- */
-function getActiveUVBounds() {
-  if (perMaterialBounds.size === 0) return null;
-
-  // Get the first material's bounds (should be the "outside" material)
-  const firstEntry = perMaterialBounds.values().next().value;
-  if (!firstEntry || !firstEntry.entries || firstEntry.entries.length === 0) return null;
-
-  const uvBounds = firstEntry.entries[0];
-  const origTexWidth = firstEntry.origTexWidth || CANVAS_SIZE;
-  const origTexHeight = firstEntry.origTexHeight || CANVAS_SIZE;
-
-  // Calculate pixel dimensions of UV region on canvas
-  const rectW = uvBounds.width * CANVAS_SIZE;
-  const rectH = uvBounds.height * CANVAS_SIZE;
-
-  return {
-    ...uvBounds,
-    rectW,
-    rectH,
-    origTexWidth,
-    origTexHeight
-  };
-}
-
-/**
- * Calculate transform constraints for a layer to keep it within UV bounds
- * Returns max offset values that keep the layer visible within the printable area
- *
- * @param {Object} layer - The image layer with img and transform
- * @returns {{ maxOffsetX: number, maxOffsetY: number, minOffsetX: number, minOffsetY: number } | null}
- */
-function getLayerConstraints(layer) {
-  if (!layer || !layer.img) return null;
-
-  const uvBounds = getActiveUVBounds();
-  if (!uvBounds) return null;
-
-  const { rectW, rectH, origTexWidth, origTexHeight } = uvBounds;
-  const img = layer.img;
-  const tr = layer.transform;
-
-  // Calculate distortion factor (same as in redrawImage)
-  const baseTexAspect = origTexWidth / origTexHeight;
-  const distortionFactor = baseTexAspect; // canvas is square, so canvasAspect = 1
-
-  // Calculate image draw dimensions (same logic as redrawImage contain mode)
-  const imgAspect = img.width / img.height;
-  const trueRectAspect = (rectW / rectH) * distortionFactor;
-
-  let baseDrawW, baseDrawH;
-  if (imgAspect > trueRectAspect) {
-    baseDrawW = rectW;
-    baseDrawH = rectW / imgAspect / distortionFactor;
-  } else {
-    baseDrawH = rectH;
-    baseDrawW = rectH * imgAspect / distortionFactor;
-  }
-
-  // Clamp to rect bounds
-  if (baseDrawW > rectW) {
-    const scale = rectW / baseDrawW;
-    baseDrawW = rectW;
-    baseDrawH *= scale;
-  }
-  if (baseDrawH > rectH) {
-    const scale = rectH / baseDrawH;
-    baseDrawH = rectH;
-    baseDrawW *= scale;
-  }
-
-  // Get current scale (use uniform or average of scaleX/scaleY)
-  const scaleX = tr.scaleX !== undefined ? tr.scaleX : (tr.scale || 1);
-  const scaleY = tr.scaleY !== undefined ? tr.scaleY : (tr.scale || 1);
-
-  // Scaled draw dimensions
-  const scaledDrawW = baseDrawW * scaleX;
-  const scaledDrawH = baseDrawH * scaleY;
-
-  // Calculate maximum offset that keeps layer within bounds
-  // The layer is centered by default, offset is relative to rectW/rectH
-  // We want to keep at least 20% of the layer visible within the UV bounds
-  const visibilityMargin = 0.2; // Keep at least 20% of layer inside bounds
-
-  const maxOffsetX = 0.5 - (scaledDrawW * visibilityMargin) / (2 * rectW);
-  const maxOffsetY = 0.5 - (scaledDrawH * visibilityMargin) / (2 * rectH);
-
-  return {
-    minOffsetX: -maxOffsetX,
-    maxOffsetX: maxOffsetX,
-    minOffsetY: -maxOffsetY,
-    maxOffsetY: maxOffsetY
-  };
-}
-
-/**
- * Constrain a layer's transform values to keep layer within UV bounds
- * Modifies the transform in place
- *
- * @param {Object} layer - The image layer
- */
-function constrainLayerTransform(layer) {
-  if (!layer || !layer.transform) return;
-
-  const constraints = getLayerConstraints(layer);
-  if (!constraints) return;
-
-  const tr = layer.transform;
-
-  // Clamp offsets to constraints
-  tr.offsetX = Math.max(constraints.minOffsetX, Math.min(constraints.maxOffsetX, tr.offsetX));
-  tr.offsetY = Math.max(constraints.minOffsetY, Math.min(constraints.maxOffsetY, tr.offsetY));
-}
-
 function attachSliderEvents() {
   // Direct handlers - no snapping, free adjustment
   const directOffset = makeDirectHandler(false);
@@ -1521,10 +1404,6 @@ function attachSliderEvents() {
     const layer = getActiveLayer();
     if (!layer) return;
     layer.transform.offsetX = directOffset(raw);
-    // Apply constraints to keep layer within UV bounds
-    constrainLayerTransform(layer);
-    // Update slider to show constrained value
-    e.target.value = layer.transform.offsetX;
     redrawImage();
   });
 
@@ -1535,14 +1414,10 @@ function attachSliderEvents() {
     const layer = getActiveLayer();
     if (!layer) return;
     layer.transform.offsetY = directOffset(raw);
-    // Apply constraints to keep layer within UV bounds
-    constrainLayerTransform(layer);
-    // Update slider to show constrained value
-    e.target.value = layer.transform.offsetY;
     redrawImage();
   });
 
-  // Scale - when scale changes, re-constrain offsets as larger scale reduces allowed offset range
+  // Scale
   const scaleEl = document.getElementById("scale");
   scaleEl.addEventListener("input", (e) => {
     const raw = parseFloat(e.target.value);
@@ -1552,11 +1427,6 @@ function attachSliderEvents() {
     // Also update scaleX/scaleY to stay in sync
     layer.transform.scaleX = layer.transform.scale;
     layer.transform.scaleY = layer.transform.scale;
-    // Re-constrain offsets since scale change affects allowed offset range
-    constrainLayerTransform(layer);
-    // Update offset sliders to show constrained values
-    document.getElementById("offsetX").value = layer.transform.offsetX;
-    document.getElementById("offsetY").value = layer.transform.offsetY;
     redrawImage();
   });
 
@@ -2166,8 +2036,6 @@ function onEditOverlayMouseMove(e) {
       // Layer moves 2x faster than the frame appears to move
       layer.transform.offsetX = editDragStartTransform.offsetX + (rotDx / bounds.baseWidth) * LAYER_MOVE_MULTIPLIER;
       layer.transform.offsetY = editDragStartTransform.offsetY + (rotDy / bounds.baseHeight) * LAYER_MOVE_MULTIPLIER;
-      // Apply constraints to keep layer within UV bounds
-      constrainLayerTransform(layer);
       break;
 
     case "scale-nw":
@@ -2190,8 +2058,6 @@ function onEditOverlayMouseMove(e) {
         layer.transform.scaleY = Math.max(0.1, Math.min(5, baseScaleY * scaleFactor));
         // Update uniform scale to average for compatibility
         layer.transform.scale = (layer.transform.scaleX + layer.transform.scaleY) / 2;
-        // Re-constrain offsets since scale change affects allowed offset range
-        constrainLayerTransform(layer);
       }
       break;
 
@@ -2204,8 +2070,6 @@ function onEditOverlayMouseMove(e) {
         const scaleFactor = currentDist / Math.max(startDist, 1);
         const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : (editDragStartTransform.scale || 1);
         layer.transform.scaleY = Math.max(0.1, Math.min(5, baseScaleY * scaleFactor));
-        // Re-constrain offsets since scale change affects allowed offset range
-        constrainLayerTransform(layer);
       }
       break;
 
@@ -2218,8 +2082,6 @@ function onEditOverlayMouseMove(e) {
         const scaleFactor = currentDist / Math.max(startDist, 1);
         const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : (editDragStartTransform.scale || 1);
         layer.transform.scaleX = Math.max(0.1, Math.min(5, baseScaleX * scaleFactor));
-        // Re-constrain offsets since scale change affects allowed offset range
-        constrainLayerTransform(layer);
       }
       break;
 
