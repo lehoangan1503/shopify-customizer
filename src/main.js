@@ -2254,6 +2254,7 @@ async function orderNow() {
     const printCanvas = await exportForPrint();
     if (!printCanvas) {
       alert("Cannot export texture. Please ensure the model is loaded.");
+      window.stopOrderLoading?.();
       return;
     }
 
@@ -2300,6 +2301,7 @@ async function orderNow() {
     console.error("Order error:", e);
     alert("Error processing order:\n" + e.message);
     setStatus("Error: " + e.message);
+    window.stopOrderLoading?.();
   }
 }
 
@@ -2325,6 +2327,7 @@ function finishOrder(url) {
   );
 
   setStatus("Request sent to Shopify.");
+  window.stopOrderLoading?.();
 }
 
 document.getElementById("orderNowBtn").addEventListener("click", orderNow);

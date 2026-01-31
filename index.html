@@ -274,11 +274,66 @@
         pointer-events: auto;
       }
 
-      /* Tips dialog toggle button */
+      /* Floating Order Now button - top-left */
+      .order-now-floating-btn {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: auto;
+        max-width: fit-content;
+        padding: 10px 20px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        transition: background 0.2s, transform 0.15s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .order-now-floating-btn:hover {
+        background: #45a049;
+        transform: scale(1.02);
+      }
+      .order-now-floating-btn:active {
+        transform: scale(0.98);
+      }
+
+      /* Order Now loading state */
+      .order-now-floating-btn.loading {
+        pointer-events: none;
+        opacity: 0.8;
+      }
+      .order-now-floating-btn .spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .order-now-floating-btn.loading .spinner {
+        display: inline-block;
+      }
+      .order-now-floating-btn.loading .btn-text {
+        display: none;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Tips dialog toggle button - top-left next to Order Now */
       .tips-toggle-btn {
         position: fixed;
-        bottom: 20px;
-        right: 20px;
+        top: 20px;
+        left: 140px;
         width: 44px;
         height: 44px;
         border-radius: 50%;
@@ -302,37 +357,11 @@
         transform: scale(0.95);
       }
 
-      /* Floating Order Now button */
-      .order-now-floating-btn {
-        position: fixed;
-        bottom: 20px;
-        right: 80px; /* Position to the left of tips toggle (44px width + 16px gap + 20px right) */
-        width: auto;
-        padding: 10px 20px;
-        background: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        z-index: 1000;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        transition: background 0.2s, transform 0.15s;
-      }
-      .order-now-floating-btn:hover {
-        background: #45a049;
-        transform: scale(1.02);
-      }
-      .order-now-floating-btn:active {
-        transform: scale(0.98);
-      }
-
-      /* Tips dialog */
+      /* Tips dialog - below buttons */
       .tips-dialog {
         position: fixed;
-        bottom: 74px;
-        right: 20px;
+        top: 70px;
+        left: 20px;
         width: 280px;
         background: white;
         border-radius: 12px;
@@ -453,25 +482,27 @@
           height: 22px;
         }
 
+        .order-now-floating-btn {
+          top: 15px;
+          left: 15px;
+          width: auto;
+          max-width: fit-content;
+          padding: 8px 16px;
+          font-size: 13px;
+        }
+
         .tips-toggle-btn {
-          bottom: 15px;
-          right: 15px;
+          top: 15px;
+          left: 120px;
           width: 40px;
           height: 40px;
           font-size: 18px;
         }
 
-        .order-now-floating-btn {
-          bottom: 15px;
-          right: 70px;
-          padding: 8px 16px;
-          font-size: 13px;
-        }
-
         .tips-dialog {
-          bottom: 65px;
-          right: 10px;
+          top: 65px;
           left: 10px;
+          right: 10px;
           width: auto;
         }
       }
@@ -533,7 +564,10 @@
     </div>
 
     <!-- Floating Order Now Button -->
-    <button id="order-now-floating" class="order-now-floating-btn">Order Now</button>
+    <button id="order-now-floating" class="order-now-floating-btn">
+      <span class="btn-text">Order Now</span>
+      <span class="spinner"></span>
+    </button>
 
     <!-- 3D Controls Tips Dialog -->
     <button id="tips-toggle" class="tips-toggle-btn" aria-label="Show 3D controls help">?</button>
@@ -588,12 +622,21 @@
         }
       });
 
-      // Floating Order Now button - triggers the original orderNowBtn click
+      // Floating Order Now button - triggers the original orderNowBtn click with loading state
       const orderNowFloating = document.getElementById('order-now-floating');
       const orderNowBtn = document.getElementById('orderNowBtn');
       orderNowFloating?.addEventListener('click', () => {
-        orderNowBtn?.click(); // Trigger the existing Order Now button's click handler
+        // Add loading state
+        orderNowFloating.classList.add('loading');
+        // Trigger the existing Order Now button's click handler
+        orderNowBtn?.click();
       });
+
+      // Expose function to stop loading state (called from main.js when orderNow completes)
+      window.stopOrderLoading = function() {
+        const btn = document.getElementById('order-now-floating');
+        btn?.classList.remove('loading');
+      };
     </script>
   </body>
 </html>
