@@ -343,25 +343,42 @@ async function exportForPrint() {
   /** @type {{origTexWidth: number, origTexHeight: number}|null} */
   let textureDimensions = null;
 
-  perMaterialBounds.forEach((info) => {
-    const { entries, origTexWidth, origTexHeight, mat } = info;
-    const matName = (mat?.name || "").toLowerCase();
+  // First, try to find the "outside" material by traversing the model
+  // This ensures we check both mesh name and material name consistently
+  loadedModel.traverse((child) => {
+    if (uvBounds) return; // Already found
+    if (!child.isMesh) return;
 
-    // Check if this is the "outside" or "butt_body" material
-    const isTargetMaterial = matName.includes("outside") || matName.includes("butt_body");
+    const meshName = (child.name || "").toLowerCase();
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
 
-    if (isTargetMaterial && entries && entries.length > 0) {
-      const bounds = entries[0];
-      uvBounds = {
-        minU: bounds.minU,
-        minV: bounds.minV,
-        maxU: bounds.maxU,
-        maxV: bounds.maxV
-      };
-      textureDimensions = { origTexWidth, origTexHeight };
-      console.log("[exportForPrint] Found UV bounds from perMaterialBounds:", uvBounds);
-      console.log("[exportForPrint] Original texture dimensions:", textureDimensions);
-    }
+    mats.forEach((mat) => {
+      if (uvBounds) return; // Already found
+      const matName = (mat?.name || "").toLowerCase();
+
+      // Check both mesh name AND material name (consistent with buildPerMaterialBounds)
+      const isTargetMaterial = meshName.includes("outside") || matName.includes("outside") ||
+                               meshName.includes("butt_body") || matName.includes("butt_body");
+
+      if (isTargetMaterial && perMaterialBounds.has(mat.uuid)) {
+        const info = perMaterialBounds.get(mat.uuid);
+        const { entries, origTexWidth, origTexHeight } = info;
+
+        if (entries && entries.length > 0) {
+          const bounds = entries[0];
+          uvBounds = {
+            minU: bounds.minU,
+            minV: bounds.minV,
+            maxU: bounds.maxU,
+            maxV: bounds.maxV
+          };
+          textureDimensions = { origTexWidth, origTexHeight };
+          console.log("[exportForPrint] Found UV bounds for mesh:", child.name, "material:", mat.name);
+          console.log("[exportForPrint] UV bounds:", uvBounds);
+          console.log("[exportForPrint] Original texture dimensions:", textureDimensions);
+        }
+      }
+    });
   });
 
   // Fallback: if not found in perMaterialBounds, calculate from mesh geometry
@@ -458,6 +475,14 @@ async function exportForPrint() {
                         originalTextureDimensions?.height ||
                         CANVAS_SIZE;
 
+  // Warn if using fallback dimensions - this might indicate the surface.jpg dimensions weren't captured
+  if (!textureDimensions && origTexWidth === CANVAS_SIZE && origTexHeight === CANVAS_SIZE) {
+    console.warn("[exportForPrint] WARNING: Using fallback CANVAS_SIZE dimensions. Surface.jpg dimensions may not have been captured.");
+    console.warn("[exportForPrint] originalTextureDimensions:", originalTextureDimensions);
+  } else if (origTexWidth === origTexHeight && origTexWidth === CANVAS_SIZE) {
+    console.warn("[exportForPrint] WARNING: Texture dimensions are square and equal to CANVAS_SIZE. Check if surface.jpg loaded correctly.");
+  }
+
   // Calculate the UV region dimensions in original texture pixels
   const uvWidth = uvBounds.maxU - uvBounds.minU;
   const uvHeight = uvBounds.maxV - uvBounds.minV;
@@ -471,36 +496,23 @@ async function exportForPrint() {
     aspectRatio: (originalRegionWidth / originalRegionHeight).toFixed(4)
   });
 
-  // Step 5: Create output canvas with correct aspect ratio
-  // Use the original region dimensions, but scale to ensure high resolution for printing
-  // Target: at least 300 DPI equivalent, minimum 2048px on shorter dimension
+  // Step 5: Create output canvas with EXACT original texture dimensions
+  // Use the original region dimensions directly - no upscaling, only downscale if needed
+  // This ensures the exported texture matches the original surface.jpg exactly
 
-  const MIN_DIMENSION = 2048;
-  const trueAspectRatio = originalRegionWidth / originalRegionHeight;
+  let outputWidth = Math.round(originalRegionWidth);
+  let outputHeight = Math.round(originalRegionHeight);
 
-  let outputWidth, outputHeight;
+  console.log("[exportForPrint] Target output (before capping):", outputWidth, "x", outputHeight);
 
-  if (trueAspectRatio >= 1) {
-    // Wider than tall (or square)
-    outputHeight = Math.max(MIN_DIMENSION, Math.round(originalRegionHeight));
-    outputWidth = Math.round(outputHeight * trueAspectRatio);
-  } else {
-    // Taller than wide (typical for cue stick wraps)
-    outputWidth = Math.max(MIN_DIMENSION, Math.round(originalRegionWidth));
-    outputHeight = Math.round(outputWidth / trueAspectRatio);
-  }
-
-  // Cap maximum dimension to prevent memory issues (max 8192px)
-  const MAX_DIMENSION = 8192;
-  if (outputWidth > MAX_DIMENSION) {
-    const scale = MAX_DIMENSION / outputWidth;
-    outputWidth = MAX_DIMENSION;
-    outputHeight = Math.round(outputHeight * scale);
-  }
-  if (outputHeight > MAX_DIMENSION) {
-    const scale = MAX_DIMENSION / outputHeight;
-    outputHeight = MAX_DIMENSION;
+  // Only cap if exceeding browser canvas limits (use 16384 which most browsers support)
+  // This preserves exact dimensions for typical print textures
+  const MAX_DIMENSION = 16384;
+  if (outputWidth > MAX_DIMENSION || outputHeight > MAX_DIMENSION) {
+    const scale = Math.min(MAX_DIMENSION / outputWidth, MAX_DIMENSION / outputHeight);
     outputWidth = Math.round(outputWidth * scale);
+    outputHeight = Math.round(outputHeight * scale);
+    console.log("[exportForPrint] Scaled down due to canvas limits, scale:", scale.toFixed(4));
   }
 
   console.log("[exportForPrint] Output dimensions:", outputWidth, "x", outputHeight,
