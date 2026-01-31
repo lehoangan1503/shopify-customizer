@@ -307,6 +307,225 @@ async function exportTexture() {
   // });
 }
 
+/**
+ * Export composited texture cropped to "outside" material UV bounds
+ * with correct aspect ratio for print production.
+ *
+ * The original surface texture (e.g., surface.jpg ~1141x8359) is a tall rectangle.
+ * The "outside" material UV region typically spans a portion of this texture.
+ * This function crops to that UV region and outputs at the correct aspect ratio
+ * for high-quality printing.
+ *
+ * @returns {Promise<HTMLCanvasElement|null>} - Canvas with UV-cropped texture at correct aspect ratio
+ */
+async function exportForPrint() {
+  if (!loadedModel) {
+    setStatus("⚠️ No model loaded.");
+    return null;
+  }
+
+  if (!perMaterialBounds.size) {
+    setStatus("⚠️ No texture bounds available.");
+    return null;
+  }
+
+  // Step 1: Get the full composited texture canvas
+  const fullCanvas = await exportTexture();
+  if (!fullCanvas) {
+    setStatus("⚠️ Could not generate composited texture.");
+    return null;
+  }
+
+  // Step 2: Find UV bounds for "outside" material
+  // First try to get from perMaterialBounds (preferred - already calculated)
+  /** @type {{minU: number, minV: number, maxU: number, maxV: number}|null} */
+  let uvBounds = null;
+  /** @type {{origTexWidth: number, origTexHeight: number}|null} */
+  let textureDimensions = null;
+
+  perMaterialBounds.forEach((info) => {
+    const { entries, origTexWidth, origTexHeight, mat } = info;
+    const matName = (mat?.name || "").toLowerCase();
+
+    // Check if this is the "outside" or "butt_body" material
+    const isTargetMaterial = matName.includes("outside") || matName.includes("butt_body");
+
+    if (isTargetMaterial && entries && entries.length > 0) {
+      const bounds = entries[0];
+      uvBounds = {
+        minU: bounds.minU,
+        minV: bounds.minV,
+        maxU: bounds.maxU,
+        maxV: bounds.maxV
+      };
+      textureDimensions = { origTexWidth, origTexHeight };
+      console.log("[exportForPrint] Found UV bounds from perMaterialBounds:", uvBounds);
+      console.log("[exportForPrint] Original texture dimensions:", textureDimensions);
+    }
+  });
+
+  // Fallback: if not found in perMaterialBounds, calculate from mesh geometry
+  if (!uvBounds) {
+    let minU = Infinity, minV = Infinity, maxU = -Infinity, maxV = -Infinity;
+
+    loadedModel.traverse((child) => {
+      if (!child.isMesh) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      const meshName = (child.name || "").toLowerCase();
+
+      mats.forEach((mat) => {
+        const matName = (mat?.name || "").toLowerCase();
+        const isTargetMaterial = meshName.includes("outside") || matName.includes("outside") ||
+                                 meshName.includes("butt_body") || matName.includes("butt_body");
+        if (!isTargetMaterial) return;
+
+        const geom = child.geometry;
+        if (!geom?.attributes?.uv) return;
+        const uv = geom.attributes.uv;
+
+        for (let i = 0; i < uv.count; i++) {
+          const u = uv.getX(i);
+          const v = uv.getY(i);
+          minU = Math.min(minU, u);
+          minV = Math.min(minV, v);
+          maxU = Math.max(maxU, u);
+          maxV = Math.max(maxV, v);
+        }
+      });
+    });
+
+    if (minU !== Infinity) {
+      uvBounds = { minU, minV, maxU, maxV };
+      console.log("[exportForPrint] Calculated UV bounds from geometry:", uvBounds);
+    }
+  }
+
+  // Final fallback: use first available material with UVs
+  if (!uvBounds) {
+    perMaterialBounds.forEach((info) => {
+      if (uvBounds) return; // Already found
+      const { entries, origTexWidth, origTexHeight } = info;
+      if (entries && entries.length > 0) {
+        const bounds = entries[0];
+        uvBounds = {
+          minU: bounds.minU,
+          minV: bounds.minV,
+          maxU: bounds.maxU,
+          maxV: bounds.maxV
+        };
+        textureDimensions = { origTexWidth, origTexHeight };
+        console.log("[exportForPrint] Using fallback UV bounds:", uvBounds);
+      }
+    });
+  }
+
+  if (!uvBounds) {
+    setStatus("⚠️ Could not determine UV bounds for export.");
+    return null;
+  }
+
+  // Step 3: Calculate crop region in pixel coordinates on the square canvas
+  // UV coordinate system: U goes 0->1 left to right, V goes 0->1 bottom to top
+  // Canvas coordinate system: X goes 0->width left to right, Y goes 0->height top to bottom
+  // So V needs to be flipped: canvasY = (1 - V) * canvasHeight
+  const cropX = uvBounds.minU * fullCanvas.width;
+  const cropY = (1 - uvBounds.maxV) * fullCanvas.height; // V is flipped
+  const cropW = (uvBounds.maxU - uvBounds.minU) * fullCanvas.width;
+  const cropH = (uvBounds.maxV - uvBounds.minV) * fullCanvas.height;
+
+  console.log("[exportForPrint] Crop region (canvas pixels):", {
+    cropX: cropX.toFixed(0),
+    cropY: cropY.toFixed(0),
+    cropW: cropW.toFixed(0),
+    cropH: cropH.toFixed(0)
+  });
+
+  // Step 4: Calculate output dimensions with CORRECT aspect ratio
+  // The square canvas distorts the original texture. We need to restore
+  // the correct aspect ratio based on the original texture dimensions.
+  //
+  // Original texture aspect = origTexWidth / origTexHeight
+  // UV region aspect in original space = uvWidth * origTexWidth / (uvHeight * origTexHeight)
+  //
+  // For a tall texture (e.g., 1141x8359), the UV region that appears as
+  // cropW x cropH on the square canvas actually has a different true aspect ratio.
+
+  // Get original texture dimensions (fallback to stored global or canvas size)
+  const origTexWidth = textureDimensions?.origTexWidth ||
+                       originalTextureDimensions?.width ||
+                       CANVAS_SIZE;
+  const origTexHeight = textureDimensions?.origTexHeight ||
+                        originalTextureDimensions?.height ||
+                        CANVAS_SIZE;
+
+  // Calculate the UV region dimensions in original texture pixels
+  const uvWidth = uvBounds.maxU - uvBounds.minU;
+  const uvHeight = uvBounds.maxV - uvBounds.minV;
+  const originalRegionWidth = uvWidth * origTexWidth;
+  const originalRegionHeight = uvHeight * origTexHeight;
+
+  console.log("[exportForPrint] Original texture:", origTexWidth, "x", origTexHeight);
+  console.log("[exportForPrint] UV region in original pixels:", {
+    width: originalRegionWidth.toFixed(0),
+    height: originalRegionHeight.toFixed(0),
+    aspectRatio: (originalRegionWidth / originalRegionHeight).toFixed(4)
+  });
+
+  // Step 5: Create output canvas with correct aspect ratio
+  // Use the original region dimensions, but scale to ensure high resolution for printing
+  // Target: at least 300 DPI equivalent, minimum 2048px on shorter dimension
+
+  const MIN_DIMENSION = 2048;
+  const trueAspectRatio = originalRegionWidth / originalRegionHeight;
+
+  let outputWidth, outputHeight;
+
+  if (trueAspectRatio >= 1) {
+    // Wider than tall (or square)
+    outputHeight = Math.max(MIN_DIMENSION, Math.round(originalRegionHeight));
+    outputWidth = Math.round(outputHeight * trueAspectRatio);
+  } else {
+    // Taller than wide (typical for cue stick wraps)
+    outputWidth = Math.max(MIN_DIMENSION, Math.round(originalRegionWidth));
+    outputHeight = Math.round(outputWidth / trueAspectRatio);
+  }
+
+  // Cap maximum dimension to prevent memory issues (max 8192px)
+  const MAX_DIMENSION = 8192;
+  if (outputWidth > MAX_DIMENSION) {
+    const scale = MAX_DIMENSION / outputWidth;
+    outputWidth = MAX_DIMENSION;
+    outputHeight = Math.round(outputHeight * scale);
+  }
+  if (outputHeight > MAX_DIMENSION) {
+    const scale = MAX_DIMENSION / outputHeight;
+    outputHeight = MAX_DIMENSION;
+    outputWidth = Math.round(outputWidth * scale);
+  }
+
+  console.log("[exportForPrint] Output dimensions:", outputWidth, "x", outputHeight,
+              "aspect:", (outputWidth / outputHeight).toFixed(4));
+
+  // Step 6: Create output canvas and draw cropped region
+  const outputCanvas = document.createElement("canvas");
+  outputCanvas.width = outputWidth;
+  outputCanvas.height = outputHeight;
+  const outputCtx = outputCanvas.getContext("2d");
+
+  // Draw the cropped region from the square canvas, scaled to output dimensions
+  // This effectively "un-stretches" the texture back to correct proportions
+  outputCtx.drawImage(
+    fullCanvas,
+    cropX, cropY, cropW, cropH,  // Source rectangle (from square canvas)
+    0, 0, outputWidth, outputHeight  // Destination (output canvas with correct aspect)
+  );
+
+  console.log("[exportForPrint] Export complete - canvas ready for print production");
+  setStatus("Print-ready texture exported.");
+
+  return outputCanvas;
+}
+
 async function prepareTexturesForExport(object) {
   const promises = [];
 
@@ -1160,6 +1379,123 @@ function makeDirectHandler(toRadians = false) {
   };
 }
 
+/**
+ * Get UV bounds for the active material (first "outside" material)
+ * @returns {{ minU: number, minV: number, maxU: number, maxV: number, width: number, height: number, rectW: number, rectH: number, origTexWidth: number, origTexHeight: number } | null}
+ */
+function getActiveUVBounds() {
+  if (perMaterialBounds.size === 0) return null;
+
+  // Get the first material's bounds (should be the "outside" material)
+  const firstEntry = perMaterialBounds.values().next().value;
+  if (!firstEntry || !firstEntry.entries || firstEntry.entries.length === 0) return null;
+
+  const uvBounds = firstEntry.entries[0];
+  const origTexWidth = firstEntry.origTexWidth || CANVAS_SIZE;
+  const origTexHeight = firstEntry.origTexHeight || CANVAS_SIZE;
+
+  // Calculate pixel dimensions of UV region on canvas
+  const rectW = uvBounds.width * CANVAS_SIZE;
+  const rectH = uvBounds.height * CANVAS_SIZE;
+
+  return {
+    ...uvBounds,
+    rectW,
+    rectH,
+    origTexWidth,
+    origTexHeight
+  };
+}
+
+/**
+ * Calculate transform constraints for a layer to keep it within UV bounds
+ * Returns max offset values that keep the layer visible within the printable area
+ *
+ * @param {Object} layer - The image layer with img and transform
+ * @returns {{ maxOffsetX: number, maxOffsetY: number, minOffsetX: number, minOffsetY: number } | null}
+ */
+function getLayerConstraints(layer) {
+  if (!layer || !layer.img) return null;
+
+  const uvBounds = getActiveUVBounds();
+  if (!uvBounds) return null;
+
+  const { rectW, rectH, origTexWidth, origTexHeight } = uvBounds;
+  const img = layer.img;
+  const tr = layer.transform;
+
+  // Calculate distortion factor (same as in redrawImage)
+  const baseTexAspect = origTexWidth / origTexHeight;
+  const distortionFactor = baseTexAspect; // canvas is square, so canvasAspect = 1
+
+  // Calculate image draw dimensions (same logic as redrawImage contain mode)
+  const imgAspect = img.width / img.height;
+  const trueRectAspect = (rectW / rectH) * distortionFactor;
+
+  let baseDrawW, baseDrawH;
+  if (imgAspect > trueRectAspect) {
+    baseDrawW = rectW;
+    baseDrawH = rectW / imgAspect / distortionFactor;
+  } else {
+    baseDrawH = rectH;
+    baseDrawW = rectH * imgAspect / distortionFactor;
+  }
+
+  // Clamp to rect bounds
+  if (baseDrawW > rectW) {
+    const scale = rectW / baseDrawW;
+    baseDrawW = rectW;
+    baseDrawH *= scale;
+  }
+  if (baseDrawH > rectH) {
+    const scale = rectH / baseDrawH;
+    baseDrawH = rectH;
+    baseDrawW *= scale;
+  }
+
+  // Get current scale (use uniform or average of scaleX/scaleY)
+  const scaleX = tr.scaleX !== undefined ? tr.scaleX : (tr.scale || 1);
+  const scaleY = tr.scaleY !== undefined ? tr.scaleY : (tr.scale || 1);
+
+  // Scaled draw dimensions
+  const scaledDrawW = baseDrawW * scaleX;
+  const scaledDrawH = baseDrawH * scaleY;
+
+  // Calculate maximum offset that keeps layer within bounds
+  // The layer is centered by default, offset is relative to rectW/rectH
+  // We want to keep at least 20% of the layer visible within the UV bounds
+  const visibilityMargin = 0.2; // Keep at least 20% of layer inside bounds
+
+  const maxOffsetX = 0.5 - (scaledDrawW * visibilityMargin) / (2 * rectW);
+  const maxOffsetY = 0.5 - (scaledDrawH * visibilityMargin) / (2 * rectH);
+
+  return {
+    minOffsetX: -maxOffsetX,
+    maxOffsetX: maxOffsetX,
+    minOffsetY: -maxOffsetY,
+    maxOffsetY: maxOffsetY
+  };
+}
+
+/**
+ * Constrain a layer's transform values to keep layer within UV bounds
+ * Modifies the transform in place
+ *
+ * @param {Object} layer - The image layer
+ */
+function constrainLayerTransform(layer) {
+  if (!layer || !layer.transform) return;
+
+  const constraints = getLayerConstraints(layer);
+  if (!constraints) return;
+
+  const tr = layer.transform;
+
+  // Clamp offsets to constraints
+  tr.offsetX = Math.max(constraints.minOffsetX, Math.min(constraints.maxOffsetX, tr.offsetX));
+  tr.offsetY = Math.max(constraints.minOffsetY, Math.min(constraints.maxOffsetY, tr.offsetY));
+}
+
 function attachSliderEvents() {
   // Direct handlers - no snapping, free adjustment
   const directOffset = makeDirectHandler(false);
@@ -1173,6 +1509,10 @@ function attachSliderEvents() {
     const layer = getActiveLayer();
     if (!layer) return;
     layer.transform.offsetX = directOffset(raw);
+    // Apply constraints to keep layer within UV bounds
+    constrainLayerTransform(layer);
+    // Update slider to show constrained value
+    e.target.value = layer.transform.offsetX;
     redrawImage();
   });
 
@@ -1183,16 +1523,28 @@ function attachSliderEvents() {
     const layer = getActiveLayer();
     if (!layer) return;
     layer.transform.offsetY = directOffset(raw);
+    // Apply constraints to keep layer within UV bounds
+    constrainLayerTransform(layer);
+    // Update slider to show constrained value
+    e.target.value = layer.transform.offsetY;
     redrawImage();
   });
 
-  // Scale
+  // Scale - when scale changes, re-constrain offsets as larger scale reduces allowed offset range
   const scaleEl = document.getElementById("scale");
   scaleEl.addEventListener("input", (e) => {
     const raw = parseFloat(e.target.value);
     const layer = getActiveLayer();
     if (!layer) return;
     layer.transform.scale = directScale(raw);
+    // Also update scaleX/scaleY to stay in sync
+    layer.transform.scaleX = layer.transform.scale;
+    layer.transform.scaleY = layer.transform.scale;
+    // Re-constrain offsets since scale change affects allowed offset range
+    constrainLayerTransform(layer);
+    // Update offset sliders to show constrained values
+    document.getElementById("offsetX").value = layer.transform.offsetX;
+    document.getElementById("offsetY").value = layer.transform.offsetY;
     redrawImage();
   });
 
@@ -1802,6 +2154,8 @@ function onEditOverlayMouseMove(e) {
       // Layer moves 2x faster than the frame appears to move
       layer.transform.offsetX = editDragStartTransform.offsetX + (rotDx / bounds.baseWidth) * LAYER_MOVE_MULTIPLIER;
       layer.transform.offsetY = editDragStartTransform.offsetY + (rotDy / bounds.baseHeight) * LAYER_MOVE_MULTIPLIER;
+      // Apply constraints to keep layer within UV bounds
+      constrainLayerTransform(layer);
       break;
 
     case "scale-nw":
@@ -1824,6 +2178,8 @@ function onEditOverlayMouseMove(e) {
         layer.transform.scaleY = Math.max(0.1, Math.min(5, baseScaleY * scaleFactor));
         // Update uniform scale to average for compatibility
         layer.transform.scale = (layer.transform.scaleX + layer.transform.scaleY) / 2;
+        // Re-constrain offsets since scale change affects allowed offset range
+        constrainLayerTransform(layer);
       }
       break;
 
@@ -1836,6 +2192,8 @@ function onEditOverlayMouseMove(e) {
         const scaleFactor = currentDist / Math.max(startDist, 1);
         const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : (editDragStartTransform.scale || 1);
         layer.transform.scaleY = Math.max(0.1, Math.min(5, baseScaleY * scaleFactor));
+        // Re-constrain offsets since scale change affects allowed offset range
+        constrainLayerTransform(layer);
       }
       break;
 
@@ -1848,6 +2206,8 @@ function onEditOverlayMouseMove(e) {
         const scaleFactor = currentDist / Math.max(startDist, 1);
         const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : (editDragStartTransform.scale || 1);
         layer.transform.scaleX = Math.max(0.1, Math.min(5, baseScaleX * scaleFactor));
+        // Re-constrain offsets since scale change affects allowed offset range
+        constrainLayerTransform(layer);
       }
       break;
 
@@ -2013,15 +2373,20 @@ async function uploadToBackend(blob) {
 
 async function orderNow() {
   try {
-    setStatus("Preparing texture...");
-    const cutCanvas = await exportTexture();
-    if (!cutCanvas) {
-      alert("Cannot export texture.");
+    setStatus("Preparing print-ready texture...");
+
+    // Use exportForPrint() for UV-cropped output with correct aspect ratio
+    // This produces a high-resolution texture suitable for print production
+    const printCanvas = await exportForPrint();
+    if (!printCanvas) {
+      alert("Cannot export texture. Please ensure the model is loaded.");
       return;
     }
 
+    console.log("[orderNow] Print canvas dimensions:", printCanvas.width, "x", printCanvas.height);
+
     // Convert canvas to blob (PNG for initial quality)
-    const pngBlob = await new Promise((r) => cutCanvas.toBlob(r, "image/png"));
+    const pngBlob = await new Promise((r) => printCanvas.toBlob(r, "image/png"));
 
     // Compress to JPEG at 82% quality (preserves full resolution)
     // This reduces file size for upload while keeping all pixels
