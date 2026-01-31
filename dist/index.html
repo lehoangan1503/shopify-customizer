@@ -134,6 +134,30 @@
         color: hsl(var(--muted-foreground));
       }
 
+      /* Upload button styling */
+      .upload-btn {
+        display: inline-block;
+        width: 100%;
+        padding: 9px 10px;
+        margin: 6px 0;
+        border-radius: var(--radius);
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--secondary));
+        color: hsl(var(--foreground));
+        cursor: pointer;
+        transition: background 0.18s, transform 0.08s;
+        font-weight: 600;
+        font-size: 14px;
+        text-align: center;
+        box-sizing: border-box;
+      }
+      .upload-btn:hover {
+        background: hsl(var(--primary) / 0.08);
+      }
+      .upload-btn:active {
+        transform: scale(0.99);
+      }
+
       /* image list items */
       #imageList .image-item {
         display: flex;
@@ -142,10 +166,16 @@
         margin-top: 8px;
       }
       .image-item {
-        padding: 8px;
+        padding: 8px 10px;
         background: #fff;
         border-radius: 6px;
         border: 1px solid #e7e7e7;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+      }
+      .image-item:hover:not(.disabled) {
+        border-color: #d1d5db;
+        background: #fafafa;
       }
       .image-item.dragging {
         opacity: 0.6;
@@ -156,6 +186,43 @@
         background: transparent;
         width: 100%;
         font-size: 13px;
+        cursor: pointer;
+      }
+      .image-item label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
+        margin: 0;
+        cursor: pointer;
+      }
+
+      /* Layer action buttons - modern subtle styling */
+      .image-item .layer-btn {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        margin: 0;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: #9ca3af;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .image-item .layer-btn:hover {
+        background: #f3f4f6;
+        color: #374151;
+      }
+      .image-item .layer-btn.del:hover {
+        background: #fef2f2;
+        color: #dc2626;
       }
 
       /* Disabled surface layer styling */
@@ -163,14 +230,16 @@
         opacity: 0.5;
         pointer-events: none;
         background: #f5f5f5;
+        cursor: default;
       }
       .image-item.disabled .layer-name {
         color: #999;
+        cursor: default;
       }
       .image-item.disabled input[type="radio"] {
         pointer-events: none;
       }
-      .image-item.disabled button {
+      .image-item.disabled .layer-btn {
         display: none;
       }
 
@@ -179,6 +248,12 @@
         border-color: #22c55e;
         background: #f0fdf4;
         box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+      }
+      .image-item.selected .layer-btn:hover {
+        background: #dcfce7;
+      }
+      .image-item.selected .layer-btn.del:hover {
+        background: #fef2f2;
       }
 
       /* Edit frame overlay */
@@ -198,16 +273,17 @@
         pointer-events: auto;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-CLZ39zUE.js"></script>
+    <script type="module" crossorigin src="/assets/index-CO8ZU6lS.js"></script>
   </head>
 
   <body>
     <div id="sidebar">
-      <h3>Image texture</h3>
-      <input type="file" id="imgInput" accept="image/*" />
+      <h3>Customize Image</h3>
+      <label for="imgInput" class="upload-btn">Upload</label>
+      <input type="file" id="imgInput" accept="image/*" style="display: none;" />
       <div id="imageList"></div>
 
-      <h3>Customize</h3>
+      <h3>How To Use</h3>
       <div class="control-group" id="sliderControls" style="display: none;">
         <label for="offsetX">Horizontal</label>
         <input type="range" id="offsetX" min="-5" max="5" step="0.01" value="0" />
@@ -218,7 +294,7 @@
         <label for="rotation">Rotation</label>
         <input type="range" id="rotation" min="-360" max="360" step="1" value="0" />
       </div>
-      <p id="customizeHint" style="font-size: 12px; color: #888; margin-top: 8px;">Select a custom layer to edit it directly on the 3D view.</p>
+      <p id="customizeHint" style="font-size: 12px; color: #888; margin-top: 8px;">Upload custom images, change stack order of custom layers by dragging. Select a layer to edit it on the 3D view.</p>
 
       <h3>Order</h3>
       <button id="orderNowBtn" class="primary">Order Now</button>

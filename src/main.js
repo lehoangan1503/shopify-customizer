@@ -733,23 +733,52 @@ function updateLayerUI() {
           <input type="radio" name="activeImage" ${i === activeLayerIndex ? "checked" : ""} ${isSurface ? "disabled" : ""} />
           <input type="text" class="layer-name" value="${layer.name}" ${isSurface ? "readonly" : ""} />
         </label>
-        <button class="dup" title="Duplicate layer">⧉</button>
-        <button class="del" title="Delete layer">×</button>
+        <button class="layer-btn dup" title="Duplicate layer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+        <button class="layer-btn del" title="Delete layer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       `;
 
     // --- UI wiring ---
     const radio = div.querySelector('input[type="radio"]');
     const nameInput = div.querySelector(".layer-name");
-    const dupBtn = div.querySelector("button.dup");
-    const delBtn = div.querySelector("button.del");
+    const dupBtn = div.querySelector(".layer-btn.dup");
+    const delBtn = div.querySelector(".layer-btn.del");
 
-    // Only allow selection of non-Surface layers
-    radio.addEventListener("change", () => {
-      if (!isSurface) {
-        activeLayerIndex = i;
-        updateSliders();
-        updateEditOverlay();
+    /**
+     * Select this layer and update UI
+     * Works for both initial selection and re-clicking an already active layer
+     */
+    function selectLayer() {
+      if (isSurface) return;
+      activeLayerIndex = i;
+      radio.checked = true;
+      // Re-render to ensure selected styling is applied (handles re-click case)
+      updateLayerUI();
+      updateSliders();
+      updateEditOverlay();
+    }
+
+    // Make entire container clickable to select layer
+    div.addEventListener("click", (e) => {
+      // Don't select if clicking on buttons or name input (let those handle their own events)
+      if (e.target.closest(".layer-btn") || e.target.classList.contains("layer-name")) {
+        return;
       }
+      selectLayer();
+    });
+
+    // Radio change also selects (for keyboard accessibility)
+    radio.addEventListener("change", () => {
+      selectLayer();
     });
 
     // Prevent clicking on disabled radio from doing anything
@@ -766,7 +795,13 @@ function updateLayerUI() {
       }
     });
 
-    dupBtn.addEventListener("click", () => {
+    // Stop propagation on name input click to prevent container click
+    nameInput.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+
+    dupBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent container click
       if (isSurface) return;
       const newTransform = { ...layer.transform };
       const newLayer = { img: layer.img, transform: newTransform, name: layer.name + " copy", fitMode: layer.fitMode || "contain" };
@@ -777,7 +812,8 @@ function updateLayerUI() {
       redrawImage();
     });
 
-    delBtn.addEventListener("click", () => {
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent container click
       if (isSurface) return;
       imageLayers.splice(i, 1);
       if (imageLayers.length === 0) {
@@ -1478,9 +1514,11 @@ function getEditFrameBounds() {
   const scaleX = tr.scaleX !== undefined ? tr.scaleX : (tr.scale || 1);
   const scaleY = tr.scaleY !== undefined ? tr.scaleY : (tr.scale || 1);
 
-  // Offset is relative to frame size
-  const offsetPixelsX = tr.offsetX * frameWidth;
-  const offsetPixelsY = tr.offsetY * frameHeight;
+  // Frame moves at 0.5x speed relative to layer movement on 3D model
+  // This gives users more control range - frame stays in view while layer can move further
+  const FRAME_SPEED = 0.5;
+  const offsetPixelsX = tr.offsetX * frameWidth * FRAME_SPEED;
+  const offsetPixelsY = tr.offsetY * frameHeight * FRAME_SPEED;
 
   return {
     x: centerX - (frameWidth * scaleX) / 2 + offsetPixelsX,
@@ -1753,53 +1791,63 @@ function onEditOverlayMouseMove(e) {
   const rotDx = dx * cos - dy * sin;
   const rotDy = dx * sin + dy * cos;
 
+  // Layer movement multiplier - layer on 3D model moves 2x relative to green frame
+  // This means for every 1px the frame moves, the layer moves 2px worth on the texture
+  const LAYER_MOVE_MULTIPLIER = 2.0;
+
   switch (editDragMode) {
     case "move":
       // Move: update offsetX/offsetY
       // Convert pixel movement to offset units (relative to frame size)
-      layer.transform.offsetX = editDragStartTransform.offsetX + rotDx / bounds.baseWidth;
-      layer.transform.offsetY = editDragStartTransform.offsetY + rotDy / bounds.baseHeight;
+      // Layer moves 2x faster than the frame appears to move
+      layer.transform.offsetX = editDragStartTransform.offsetX + (rotDx / bounds.baseWidth) * LAYER_MOVE_MULTIPLIER;
+      layer.transform.offsetY = editDragStartTransform.offsetY + (rotDy / bounds.baseHeight) * LAYER_MOVE_MULTIPLIER;
       break;
 
     case "scale-nw":
     case "scale-ne":
     case "scale-sw":
     case "scale-se":
-      // Corner handles: uniform scaling
-      // Calculate scale factor based on distance from center
+      // Corner handles: uniform scaling (scales both X and Y proportionally)
+      // IMPORTANT: Scale from current scaleX/scaleY values, not reset to uniform
       {
         const startDist = Math.hypot(editDragStartX - bounds.centerX, editDragStartY - bounds.centerY);
         const currentDist = Math.hypot(x - bounds.centerX, y - bounds.centerY);
         const scaleFactor = currentDist / Math.max(startDist, 1);
-        const baseScale = editDragStartTransform.scale || 1;
-        layer.transform.scale = Math.max(0.1, Math.min(3, baseScale * scaleFactor));
-        // Also update scaleX/scaleY to match
-        layer.transform.scaleX = layer.transform.scale;
-        layer.transform.scaleY = layer.transform.scale;
+
+        // Get the starting scaleX and scaleY (preserve individual values)
+        const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : (editDragStartTransform.scale || 1);
+        const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : (editDragStartTransform.scale || 1);
+
+        // Apply same scale factor to both, preserving the ratio between them
+        layer.transform.scaleX = Math.max(0.1, Math.min(5, baseScaleX * scaleFactor));
+        layer.transform.scaleY = Math.max(0.1, Math.min(5, baseScaleY * scaleFactor));
+        // Update uniform scale to average for compatibility
+        layer.transform.scale = (layer.transform.scaleX + layer.transform.scaleY) / 2;
       }
       break;
 
     case "scale-n":
     case "scale-s":
-      // Vertical edge: scale Y only
+      // Vertical edge: scale Y only (preserves scaleX)
       {
         const startDist = Math.abs(editDragStartY - bounds.centerY);
         const currentDist = Math.abs(y - bounds.centerY);
         const scaleFactor = currentDist / Math.max(startDist, 1);
         const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : (editDragStartTransform.scale || 1);
-        layer.transform.scaleY = Math.max(0.1, Math.min(3, baseScaleY * scaleFactor));
+        layer.transform.scaleY = Math.max(0.1, Math.min(5, baseScaleY * scaleFactor));
       }
       break;
 
     case "scale-e":
     case "scale-w":
-      // Horizontal edge: scale X only
+      // Horizontal edge: scale X only (preserves scaleY)
       {
         const startDist = Math.abs(editDragStartX - bounds.centerX);
         const currentDist = Math.abs(x - bounds.centerX);
         const scaleFactor = currentDist / Math.max(startDist, 1);
         const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : (editDragStartTransform.scale || 1);
-        layer.transform.scaleX = Math.max(0.1, Math.min(3, baseScaleX * scaleFactor));
+        layer.transform.scaleX = Math.max(0.1, Math.min(5, baseScaleX * scaleFactor));
       }
       break;
 
@@ -1870,56 +1918,174 @@ window.addEventListener("resize", () => {
 // NEW: export full texture canvas (2048) + Add-to-Cart upload flow
 // ------------------------------
 
+/**
+ * Compress an image blob to reduce file size before upload
+ * Reduces quality (JPEG compression) WITHOUT resizing dimensions
+ * This preserves full resolution for better rendering on the 3D model
+ *
+ * @param {Blob} blob - Original image blob
+ * @param {number} quality - JPEG quality (0-1), default 0.82 for good balance
+ * @returns {Promise<Blob>} - Compressed blob at original resolution
+ */
+async function compressImageBlob(blob, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      // Keep original dimensions - no resizing
+      const width = img.width;
+      const height = img.height;
+
+      // Create canvas at full resolution
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Clean up object URL
+      URL.revokeObjectURL(objectUrl);
+
+      // Convert to JPEG with quality compression (no dimension change)
+      canvas.toBlob(
+        (compressedBlob) => {
+          if (compressedBlob) {
+            const originalKB = (blob.size / 1024).toFixed(1);
+            const compressedKB = (compressedBlob.size / 1024).toFixed(1);
+            const reduction = (((blob.size - compressedBlob.size) / blob.size) * 100).toFixed(0);
+            console.log(`[Compress] ${originalKB}KB -> ${compressedKB}KB (${reduction}% reduction, ${width}x${height} preserved)`);
+            resolve(compressedBlob);
+          } else {
+            reject(new Error("Failed to compress image"));
+          }
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load image for compression"));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
+ * Upload image via secure backend API
+ * Uses signed Cloudinary uploads through our serverless function
+ * Subject to Vercel 4.5MB payload limit - images are compressed before upload
+ *
+ * @param {Blob} blob - Image blob to upload
+ * @returns {Promise<string>} - Cloudinary secure URL
+ */
+async function uploadToBackend(blob) {
+  const formData = new FormData();
+  formData.append("file", blob, "design.jpg");
+
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    // Parse error response for better messaging
+    let errorMessage = "Upload failed";
+    try {
+      const errorData = await response.json();
+      if (response.status === 413) {
+        errorMessage = `Image too large (${(blob.size / 1024 / 1024).toFixed(1)}MB). Please use a smaller image or reduce quality.`;
+      } else {
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      }
+    } catch {
+      errorMessage = await response.text();
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  return data.url;
+}
+
 async function orderNow() {
   try {
-    setStatus("🧩 Preparing outside texture...");
+    setStatus("Preparing texture...");
     const cutCanvas = await exportTexture();
     if (!cutCanvas) {
-      alert("⚠️ Không thể xuất hình ngoài.");
+      alert("Cannot export texture.");
       return;
     }
 
-    // Convert canvas → blob
-    const blob = await new Promise((r) => cutCanvas.toBlob(r, "image/png"));
-    const formData = new FormData();
-    formData.append("file", blob, "design.png");
+    // Convert canvas to blob (PNG for initial quality)
+    const pngBlob = await new Promise((r) => cutCanvas.toBlob(r, "image/png"));
 
-    // 🖼 Upload Cloudinary qua Vercel backend
-    setStatus("☁️ Uploading design...");
-    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text();
-      throw new Error("Upload failed: " + errText);
+    // Compress to JPEG at 82% quality (preserves full resolution)
+    // This reduces file size for upload while keeping all pixels
+    setStatus("Compressing image...");
+    const compressedBlob = await compressImageBlob(pngBlob, 0.82);
+
+    // Check if compressed size is still too large (> 3.5MB to leave headroom)
+    const maxSizeMB = 3.5;
+    if (compressedBlob.size > maxSizeMB * 1024 * 1024) {
+      // Try more aggressive compression
+      console.log(`[Upload] Image still large (${(compressedBlob.size / 1024 / 1024).toFixed(1)}MB), applying stronger compression...`);
+      setStatus("Applying stronger compression...");
+      const moreCompressed = await compressImageBlob(pngBlob, 0.70);
+
+      if (moreCompressed.size > maxSizeMB * 1024 * 1024) {
+        throw new Error(`Image is too large (${(moreCompressed.size / 1024 / 1024).toFixed(1)}MB). Maximum size is ${maxSizeMB}MB. Try using fewer or smaller overlay images.`);
+      }
+
+      // Use the more compressed version
+      setStatus("Uploading design...");
+      const url = await uploadToBackend(moreCompressed);
+      console.log("[Upload] Success with stronger compression:", url);
+      finishOrder(url);
+      return;
     }
 
-    const { url } = await uploadRes.json();
+    // Upload via secure backend API
+    setStatus("Uploading design...");
+    const url = await uploadToBackend(compressedBlob);
+
     if (!url) throw new Error("Upload failed: No URL returned");
 
-    console.log("✅ Uploaded:", url);
+    console.log("[Upload] Success:", url);
+    finishOrder(url);
 
-    // 🧠 Instead of calling Shopify from iframe (blocked by CORS),
-    // we send message to parent Shopify page
-    setStatus("📨 Sending add-to-cart request to Shopify...");
-    const params = new URLSearchParams(window.location.search);
-    const productId = params.get("variant");
-    window.parent.postMessage(
-      {
-        type: "ADD_TO_CART",
-        payload: {
-          id: productId,
-          quantity: 1,
-          properties: { "Custom Design URL": url },
-        },
-      },
-      "*"
-    );
-
-    setStatus("✅ Request sent to Shopify parent.");
   } catch (e) {
-    console.error("⚠️ Order error:", e);
-    alert("Lỗi khi xử lý đơn hàng:\n" + e.message);
-    setStatus("❌ Error: " + e.message);
+    console.error("Order error:", e);
+    alert("Error processing order:\n" + e.message);
+    setStatus("Error: " + e.message);
   }
+}
+
+/**
+ * Complete the order by sending add-to-cart message to Shopify
+ * @param {string} url - Cloudinary URL of the uploaded design
+ */
+function finishOrder(url) {
+  // Send message to parent Shopify page (iframe communication)
+  setStatus("Sending add-to-cart request to Shopify...");
+  const params = new URLSearchParams(window.location.search);
+  const productId = params.get("variant");
+  window.parent.postMessage(
+    {
+      type: "ADD_TO_CART",
+      payload: {
+        id: productId,
+        quantity: 1,
+        properties: { "Custom Design URL": url },
+      },
+    },
+    "*"
+  );
+
+  setStatus("Request sent to Shopify.");
 }
 
 document.getElementById("orderNowBtn").addEventListener("click", orderNow);
