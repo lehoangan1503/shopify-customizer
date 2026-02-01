@@ -51,6 +51,16 @@ controls.enableDamping = true;
 controls.enablePan = true; // Allow panning/moving the view
 controls.panSpeed = 0.8;
 controls.rotateSpeed = 0.8;
+
+// Background colors
+const DARK_BG = 0x2a2a2a;
+const LIGHT_BG = 0xf2f4f8;
+
+// Listen for background toggle from UI
+window.addEventListener('toggle-background', (e) => {
+  const isDark = e.detail.dark;
+  scene.background = new THREE.Color(isDark ? DARK_BG : LIGHT_BG);
+});
 // ===== GLOBALS =====
 let loadedModel = null;
 let originalMaterials = new Map();
