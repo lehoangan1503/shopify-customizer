@@ -8,7 +8,7 @@ const CUE_GLB_PATH = "./cue-butt.glb";
 // ===== SCENE =====
 const container = document.getElementById("canvas-wrap");
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2a2a2a);
+scene.background = new THREE.Color(0xf2f4f8);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.8, 4);
@@ -35,8 +35,8 @@ rgbeLoader.load(
     console.log("✅ HDR loaded:", hdrTex);
     hdrTex.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = hdrTex; // dùng cho PBR reflections
-    scene.environmentIntensity = 1.2; // Increased for mirror-like reflections
-    scene.background = new THREE.Color(0x2a2a2a);
+    scene.environmentIntensity = 0.1;
+    scene.background = new THREE.Color(0xf2f4f8);
   },
   (xhr) => {
     console.log(`HDR loading... ${((xhr.loaded / xhr.total) * 100).toFixed(2)}%`);
@@ -1155,27 +1155,11 @@ function redrawImage() {
       loadedModel.traverse((child) => {
         if (!child.isMesh) return;
         const mats = Array.isArray(child.material) ? child.material : [child.material];
-        mats.forEach((m, idx) => {
-          if (m && m.name === mat.name) {
-            // Convert to MeshPhysicalMaterial for clearcoat support
-            const physMat = new THREE.MeshPhysicalMaterial({
-              map: tex,
-              color: m.color,
-              roughness: 0.08,
-              metalness: 0.0,
-              clearcoat: 1.0,
-              clearcoatRoughness: 0.03,
-              envMap: scene.environment,
-              envMapIntensity: 1.5,
-              transparent: false,
-            });
-            physMat.name = m.name; // Keep the name
-            // Replace material on child
-            if (Array.isArray(child.material)) {
-              child.material[idx] = physMat;
-            } else {
-              child.material = physMat;
-            }
+        mats.forEach((m) => {
+          if (m && m.uuid === mat.uuid) {
+            m.map = tex;
+            m.transparent = false;
+            m.needsUpdate = true;
           }
         });
       });
@@ -1361,27 +1345,11 @@ function redrawImage() {
     loadedModel.traverse((child) => {
       if (!child.isMesh) return;
       const mats = Array.isArray(child.material) ? child.material : [child.material];
-      mats.forEach((m, idx) => {
-        if (m && m.name === mat.name) {
-          // Convert to MeshPhysicalMaterial for clearcoat support
-          const physMat = new THREE.MeshPhysicalMaterial({
-            map: tex,
-            color: m.color,
-            roughness: 0.08,
-            metalness: 0.0,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.03,
-            envMap: scene.environment,
-            envMapIntensity: 1.5,
-            transparent: false,
-          });
-          physMat.name = m.name; // Keep the name
-          // Replace material on child
-          if (Array.isArray(child.material)) {
-            child.material[idx] = physMat;
-          } else {
-            child.material = physMat;
-          }
+      mats.forEach((m) => {
+        if (m && m.uuid === mat.uuid) {
+          m.map = tex;
+          m.transparent = false;
+          m.needsUpdate = true;
         }
       });
     });
@@ -1522,23 +1490,9 @@ function loadGLBFromURL(urlOrFile) {
     loadedModel.traverse((child) => {
       if (child.isMesh && child.material) {
         originalMaterials.set(child.uuid, child.material.clone());
-
-        // Upgrade existing material properties for mirror-like lacquer finish
-        // Keep the SAME material object (preserves uuid for redrawImage matching)
-        const mat = child.material;
-        mat.envMap = scene.environment;
-        mat.envMapIntensity = 1.5;      // Strong reflections
-        mat.roughness = 0.08;           // Very smooth for mirror reflections
-        mat.metalness = 0.0;            // Non-metallic
-
-        // Add clearcoat if material supports it (MeshPhysicalMaterial)
-        // If it's MeshStandardMaterial, these properties still work but clearcoat won't
-        if (mat.isMeshStandardMaterial) {
-          mat.clearcoat = 1.0;            // Full clearcoat layer (lacquer)
-          mat.clearcoatRoughness = 0.03;  // Ultra-smooth clearcoat
-          mat.reflectivity = 1.0;
-        }
-        mat.needsUpdate = true;
+        child.material.envMap = scene.environment;
+        child.material.envMapIntensity = 0.1; // 👈 kiểm soát trực tiếp ở material
+        child.material.needsUpdate = true;
       }
     });
 
@@ -1709,23 +1663,9 @@ function loadModelAndSurface() {
       loadedModel.traverse((child) => {
         if (child.isMesh && child.material) {
           originalMaterials.set(child.uuid, child.material.clone());
-
-          // Upgrade existing material properties for mirror-like lacquer finish
-          // Keep the SAME material object (preserves uuid for redrawImage matching)
-          const mat = child.material;
-          mat.envMap = scene.environment;
-          mat.envMapIntensity = 1.5;      // Strong reflections
-          mat.roughness = 0.08;           // Very smooth for mirror reflections
-          mat.metalness = 0.0;            // Non-metallic
-
-          // Add clearcoat if material supports it (MeshPhysicalMaterial)
-          // If it's MeshStandardMaterial, these properties still work but clearcoat won't
-          if (mat.isMeshStandardMaterial) {
-            mat.clearcoat = 1.0;            // Full clearcoat layer (lacquer)
-            mat.clearcoatRoughness = 0.03;  // Ultra-smooth clearcoat
-            mat.reflectivity = 1.0;
-          }
-          mat.needsUpdate = true;
+          child.material.envMap = scene.environment;
+          child.material.envMapIntensity = 0.1;
+          child.material.needsUpdate = true;
         }
       });
 
