@@ -25,8 +25,9 @@
         overflow: hidden;
       }
 
-      /* Dashboard absolute overlay */
+      /* Dashboard absolute overlay - HIDDEN */
       #sidebar {
+        display: none; /* Sidebar hidden per user request */
         position: absolute;
         top: 0;
         left: 0;
@@ -272,8 +273,303 @@
         /* pointer-events managed dynamically by JS for pass-through behavior */
         pointer-events: auto;
       }
+
+      /* Floating Order Now button - top-left */
+      .order-now-floating-btn {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: auto;
+        max-width: fit-content;
+        padding: 10px 20px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        transition: background 0.2s, transform 0.15s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .order-now-floating-btn:hover {
+        background: #45a049;
+        transform: scale(1.02);
+      }
+      .order-now-floating-btn:active {
+        transform: scale(0.98);
+      }
+
+      /* Order Now loading state */
+      .order-now-floating-btn.loading {
+        pointer-events: none;
+        opacity: 0.8;
+      }
+      .order-now-floating-btn .spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .order-now-floating-btn.loading .spinner {
+        display: inline-block;
+      }
+      .order-now-floating-btn.loading .btn-text {
+        display: none;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Tips dialog toggle button - top-left next to Order Now */
+      .tips-toggle-btn {
+        position: fixed;
+        top: 20px;
+        left: 140px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #333;
+        color: white;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s, transform 0.15s;
+      }
+      .tips-toggle-btn:hover {
+        background: #555;
+        transform: scale(1.05);
+      }
+      .tips-toggle-btn:active {
+        transform: scale(0.95);
+      }
+
+      /* Background toggle button - next to tips */
+      .bg-toggle-btn {
+        position: fixed;
+        top: 20px;
+        left: 194px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #333;
+        color: white;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s, transform 0.15s;
+      }
+      .bg-toggle-btn:hover {
+        background: #555;
+        transform: scale(1.05);
+      }
+      .bg-toggle-btn:active {
+        transform: scale(0.95);
+      }
+      .bg-toggle-btn.light-mode {
+        background: #e0e0e0;
+        color: #333;
+      }
+      .bg-toggle-btn.light-mode:hover {
+        background: #ccc;
+      }
+
+      /* Tips dialog - below buttons */
+      .tips-dialog {
+        position: fixed;
+        top: 70px;
+        left: 20px;
+        width: 280px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        z-index: 1000;
+        overflow: hidden;
+      }
+      .tips-dialog.hidden {
+        display: none;
+      }
+      .tips-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: #333;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .tips-header button {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 22px;
+        cursor: pointer;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+      }
+      .tips-header button:hover {
+        background: rgba(255,255,255,0.15);
+      }
+      .tips-content {
+        padding: 16px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .tips-content h4 {
+        margin: 0 0 8px 0;
+        color: #333;
+        font-size: 14px;
+        font-weight: 600;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 4px;
+      }
+      .tips-content ul {
+        margin: 0 0 16px 0;
+        padding-left: 20px;
+      }
+      .tips-content li {
+        margin: 4px 0;
+        font-size: 13px;
+        color: #555;
+        line-height: 1.4;
+      }
+      .tips-content li:last-child {
+        margin-bottom: 0;
+      }
+      .tips-content ul:last-child {
+        margin-bottom: 0;
+      }
+
+      /* Mobile responsive */
+      @media (max-width: 768px) {
+        /* Sidebar mobile styles preserved but sidebar is hidden */
+        #sidebar {
+          position: fixed;
+          width: 100%;
+          height: auto;
+          max-height: 40vh;
+          bottom: 0;
+          top: auto;
+          left: 0;
+          border-right: none;
+          border-top: 1px solid hsl(var(--border));
+          border-radius: 16px 16px 0 0;
+          padding: 16px;
+          z-index: 30;
+          box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+        }
+
+        #canvas-wrap {
+          height: 100vh; /* Full height since sidebar is hidden */
+        }
+
+        button {
+          min-height: 44px;
+          font-size: 15px;
+        }
+
+        .upload-btn {
+          min-height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .image-item .layer-btn {
+          width: 36px;
+          height: 36px;
+          font-size: 16px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+          width: 22px;
+          height: 22px;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+          width: 22px;
+          height: 22px;
+        }
+
+        .order-now-floating-btn {
+          top: 15px;
+          left: 15px;
+          width: auto;
+          max-width: fit-content;
+          padding: 8px 16px;
+          font-size: 13px;
+        }
+
+        .tips-toggle-btn {
+          top: 15px;
+          left: 120px;
+          width: 40px;
+          height: 40px;
+          font-size: 18px;
+        }
+
+        .bg-toggle-btn {
+          top: 15px;
+          left: 168px;
+          width: 40px;
+          height: 40px;
+          font-size: 16px;
+        }
+
+        .tips-dialog {
+          top: 65px;
+          left: 10px;
+          right: 10px;
+          width: auto;
+        }
+      }
+
+      @media (max-width: 480px) {
+        #sidebar {
+          padding: 12px 14px;
+        }
+
+        h3 {
+          font-size: 12px;
+          margin-top: 10px;
+        }
+
+        .control-group label {
+          font-size: 12px;
+        }
+
+        #customizeHint {
+          font-size: 11px;
+        }
+      }
     </style>
-    <script type="module" crossorigin src="/assets/index-CyRKH53x.js"></script>
+    <script type="module" crossorigin src="/assets/index-CKb5t4jg.js"></script>
   </head>
 
   <body>
@@ -311,5 +607,91 @@
       <canvas id="editOverlay"></canvas>
     </div>
 
+    <!-- Floating Order Now Button -->
+    <button id="order-now-floating" class="order-now-floating-btn">
+      <span class="btn-text">Order Now</span>
+      <span class="spinner"></span>
+    </button>
+
+    <!-- 3D Controls Tips Dialog -->
+    <button id="tips-toggle" class="tips-toggle-btn" aria-label="Show 3D controls help">?</button>
+    <button id="bg-toggle" class="bg-toggle-btn" aria-label="Toggle background" title="Toggle light/dark background">&#9788;</button>
+    <div id="tips-dialog" class="tips-dialog hidden">
+      <div class="tips-header">
+        <span>3D Controls</span>
+        <button id="tips-close" aria-label="Close tips">&times;</button>
+      </div>
+      <div class="tips-content">
+        <h4>Desktop (Mouse)</h4>
+        <ul>
+          <li><b>Rotate:</b> Left-click + drag</li>
+          <li><b>Zoom:</b> Scroll wheel</li>
+          <li><b>Pan:</b> Right-click + drag</li>
+        </ul>
+
+        <h4>Desktop (Trackpad)</h4>
+        <ul>
+          <li><b>Rotate:</b> Click + drag</li>
+          <li><b>Zoom:</b> Pinch gesture or two-finger scroll</li>
+          <li><b>Pan:</b> Two-finger click + drag</li>
+        </ul>
+
+        <h4>Mobile (Touch)</h4>
+        <ul>
+          <li><b>Rotate:</b> One finger drag</li>
+          <li><b>Zoom:</b> Pinch with two fingers</li>
+          <li><b>Pan:</b> Two finger drag</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      // Tips dialog toggle
+      const tipsToggle = document.getElementById('tips-toggle');
+      const tipsDialog = document.getElementById('tips-dialog');
+      const tipsClose = document.getElementById('tips-close');
+
+      tipsToggle?.addEventListener('click', () => {
+        tipsDialog?.classList.toggle('hidden');
+      });
+
+      tipsClose?.addEventListener('click', () => {
+        tipsDialog?.classList.add('hidden');
+      });
+
+      // Close tips dialog when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!tipsDialog?.contains(e.target) && e.target !== tipsToggle) {
+          tipsDialog?.classList.add('hidden');
+        }
+      });
+
+      // Background toggle
+      const bgToggle = document.getElementById('bg-toggle');
+      let isDarkBg = true;
+      bgToggle?.addEventListener('click', () => {
+        isDarkBg = !isDarkBg;
+        bgToggle.classList.toggle('light-mode', !isDarkBg);
+        bgToggle.innerHTML = isDarkBg ? '&#9788;' : '&#9790;'; // Sun / Moon icons
+        // Dispatch custom event for main.js to handle
+        window.dispatchEvent(new CustomEvent('toggle-background', { detail: { dark: isDarkBg } }));
+      });
+
+      // Floating Order Now button - triggers the original orderNowBtn click with loading state
+      const orderNowFloating = document.getElementById('order-now-floating');
+      const orderNowBtn = document.getElementById('orderNowBtn');
+      orderNowFloating?.addEventListener('click', () => {
+        // Add loading state
+        orderNowFloating.classList.add('loading');
+        // Trigger the existing Order Now button's click handler
+        orderNowBtn?.click();
+      });
+
+      // Expose function to stop loading state (called from main.js when orderNow completes)
+      window.stopOrderLoading = function() {
+        const btn = document.getElementById('order-now-floating');
+        btn?.classList.remove('loading');
+      };
+    </script>
   </body>
 </html>

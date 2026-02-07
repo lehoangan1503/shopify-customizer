@@ -3,8 +3,43 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 
-const CUE_GLB_PATH = "./cue-butt.glb";
+// ===== IMPORT MODULES =====
+import { 
+  getCurrentProduct, 
+  getProductGLBPath,
+  getSurfacePath,
+  isLeatherProduct, 
+  logCurrentProduct,
+  PRODUCT_TYPES 
+} from "./product-config.js";
+
+import {
+  LEATHER_CONFIG,
+  RUBBER_CONFIG,
+  loadLeatherNormal,
+  loadRubberNormal,
+  loadAllNormalMaps,
+  createLeatherTextureMaps,
+  createLeatherMaterial,
+  createStandardMaterial,
+  isRubberMaterial,
+  createRubberMaterial,
+  isTopCapMaterial,
+  createTopCapTextureWithLogo,
+  createTopCapNormalWithLogo,
+  createTopCapRoughnessMapWithLogo,
+} from "./leather-material.js";
+// (rollback) bỏ tính UV bounds tự động cho mặt nắp
+
+
+// ===== PRODUCT CONFIGURATION =====
+const currentProduct = getCurrentProduct();
+logCurrentProduct();
+
+// Sử dụng GLB path từ config thay vì hardcode
+const CUE_GLB_PATH = getProductGLBPath();
 // ===== SCENE =====
 const container = document.getElementById("canvas-wrap");
 const scene = new THREE.Scene();
@@ -22,35 +57,58 @@ container.appendChild(renderer.domElement);
 // Get max anisotropy for texture filtering
 const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
 
-// lights
-scene.add(new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6));
-const dir = new THREE.DirectionalLight(0xffffff, 1.5);
-dir.position.set(3, 6, 3);
-scene.add(dir);
+// ===== KHỞI TẠO RECT AREA LIGHT =====
+RectAreaLightUniformsLib.init();
+
+// ===== STUDIO LIGHTING - ÁNH SÁNG NỀN =====
+// Ambient light - ánh sáng nền
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambientLight);
+
+// Hemisphere light - ánh sáng mềm
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xf0f0f0, 0.4);
+scene.add(hemiLight);
+
+// ĐÈN CHÍNH (RectAreaLight) sẽ được gắn vào CAMERA trong loadModelAndSurface()
+// để tạo vệt sáng RỘNG và CỐ ĐỊNH khi xoay gậy
 // === Environment Map ===
 const rgbeLoader = new RGBELoader();
-rgbeLoader.load(
-  "/env/studio_small_03_1k.hdr",
-  (hdrTex) => {
-    console.log("✅ HDR loaded:", hdrTex);
-    hdrTex.mapping = THREE.EquirectangularReflectionMapping;
-    scene.environment = hdrTex; // dùng cho PBR reflections
-    scene.environmentIntensity = 1.2; // Increased for mirror-like reflections
-    scene.background = new THREE.Color(0x2a2a2a);
-  },
-  (xhr) => {
-    console.log(`HDR loading... ${((xhr.loaded / xhr.total) * 100).toFixed(2)}%`);
-  },
-  (error) => {
-    console.error("❌ Failed to load HDR:", error);
-  }
-);
+// rgbeLoader.load(
+//   "/env/studio_small_03_1k.hdr",
+//   (hdrTex) => {
+//     console.log("✅ HDR loaded:", hdrTex);
+//     hdrTex.mapping = THREE.EquirectangularReflectionMapping;
+//     scene.environment = hdrTex; // dùng cho PBR reflections
+//     scene.environmentIntensity = 1.2; // Increased for mirror-like reflections
+//     scene.background = new THREE.Color(0x2a2a2a);
+//   },
+//   (xhr) => {
+//     console.log(`HDR loading... ${((xhr.loaded / xhr.total) * 100).toFixed(2)}%`);
+//   },
+//   (error) => {
+//     console.error("❌ Failed to load HDR:", error);
+//   }
+// );
 // orbit controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.enablePan = true; // Allow panning/moving the view
+controls.dampingFactor = 0.05;
+controls.enablePan = true;       // BẬT PAN để có thể di chuyển dọc
 controls.panSpeed = 0.8;
 controls.rotateSpeed = 0.8;
+controls.zoomSpeed = 1.0;
+
+// Giới hạn zoom
+controls.minDistance = 0.5;
+controls.maxDistance = 10;
+
+// CHỈ CHO PHÉP PAN DỌC (Y) - giữ X và Z cố định để xoay quanh trục gậy
+controls.addEventListener('change', () => {
+  // Giữ target.x và target.z ở 0 (trục gậy)
+  // Chỉ cho phép target.y thay đổi (di chuyển lên/xuống)
+  controls.target.x = 0;
+  controls.target.z = 0;
+});
 
 // Background colors
 const DARK_BG = 0x2a2a2a;
@@ -1127,12 +1185,93 @@ function updateLayerUI() {
 
 // ===== REDRAW (composite all layers on top of cached base) =====
 // Each layer has its own fitMode: "stretch" for base textures, "contain" for overlays
-function redrawImage() {
+async function redrawImage() {
   // when model not loaded or no target materials -> nothing
   if (!loadedModel || perMaterialBounds.size === 0) {
     console.log("[redrawImage] Skipping - loadedModel:", !!loadedModel, "perMaterialBounds.size:", perMaterialBounds.size);
     return;
   }
+  
+  // Load tất cả normal maps nếu là sản phẩm có da/cao su
+  if (isLeatherProduct()) {
+    await loadAllNormalMaps();
+    console.log("[redrawImage] Leather product - all normal maps ready");
+    
+    // Apply rubber material cho các material bumper/bottom
+    // Nếu mesh name match -> apply cho TẤT CẢ materials trên mesh đó
+    loadedModel.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      const meshName = child.name || "";
+      
+      // Check xem mesh có phải là rubber mesh không
+      const isMeshRubber = RUBBER_CONFIG.materialNames.some(n => 
+        meshName.toLowerCase().includes(n.toLowerCase())
+      );
+      
+      mats.forEach((mat, idx) => {
+        const isMatRubber = isRubberMaterial(mat.name, "");
+        const matNameLower = (mat.name || "").toLowerCase();
+        
+        // Detect xem đây có phải material logo không
+        // Material.003 hoặc chứa "logo", "badge", "emblem"
+        const isLogoMaterial = matNameLower.includes("material.003") || 
+                               matNameLower.includes("logo") ||
+                               matNameLower.includes("badge") ||
+                               matNameLower.includes("emblem");
+        
+        // Apply rubber nếu mesh name HOẶC material name match
+        if (isMeshRubber || isMatRubber) {
+          console.log(`[Rubber] Applying rubber to: mesh="${meshName}" material="${mat.name}" isLogo=${isLogoMaterial}`);
+          const rubberMat = createRubberMaterial(mat.map, mat.color, 1024, 1024, isLogoMaterial);
+          rubberMat.name = mat.name;
+          
+          if (Array.isArray(child.material)) {
+            child.material[idx] = rubberMat;
+          } else {
+            child.material = rubberMat;
+          }
+        }
+        
+        // Apply top cap logo nếu mesh name HOẶC material name match
+        const isTopCap = isTopCapMaterial(mat.name, meshName);
+        if (isTopCap) {
+          console.log(`[TopCap] Applying logo to: mesh="${meshName}" material="${mat.name}"`);
+          // Tạo texture với logo (theo config tâm mặt trên)
+          const logoTexture = createTopCapTextureWithLogo(mat.map, 1024, 1024);
+          const roughnessTex = createTopCapRoughnessMapWithLogo(1024, 1024);
+          
+          // Tạo material mới với logo - GIỮ NGUYÊN properties từ material gốc
+          // KHÔNG dùng normal map với emboss - logo phẳng như khắc laser
+          // Chất liệu NHỰA mờ với khắc laser (logo phẳng, sáng xám)
+          const topCapMat = new THREE.MeshPhysicalMaterial({
+            map: logoTexture,
+            color: new THREE.Color(0x1a1a1a), // nền đen nhựa
+            roughness: 0.6,
+            roughnessMap: roughnessTex,
+            metalness: 0.0,
+            clearcoat: 0.08,
+            clearcoatRoughness: 0.6,
+            reflectivity: 0.25,
+            ior: 1.45,
+            normalMap: mat.normalMap || null, // giữ normal gốc nếu phần nắp có vân riêng
+            normalScale: mat.normalScale || new THREE.Vector2(1, 1),
+            envMap: mat.envMap || scene.environment,
+            envMapIntensity: 0.4,
+            transparent: false,
+          });
+          topCapMat.name = mat.name;
+          
+          if (Array.isArray(child.material)) {
+            child.material[idx] = topCapMat;
+          } else {
+            child.material = topCapMat;
+          }
+        }
+      });
+    });
+  }
+  
   console.log("[redrawImage] Starting redraw with", imageLayers.length, "layers (per-layer fitMode)");
 
   clearCreatedTextures();
@@ -1162,34 +1301,39 @@ function redrawImage() {
       tex.needsUpdate = true;
       createdTextures.push(tex);
 
+      // ===== TẠO MATERIAL DỰA TRÊN LOẠI SẢN PHẨM =====
+      let textureMaps = null;
+      if (isLeatherProduct()) {
+        textureMaps = createLeatherTextureMaps(canvas.width, canvas.height);
+        createdTextures.push(textureMaps.roughnessTexture);
+        createdTextures.push(textureMaps.clearcoatTexture);
+        createdTextures.push(textureMaps.normalTexture);
+      }
+
       loadedModel.traverse((child) => {
         if (!child.isMesh) return;
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         mats.forEach((m, idx) => {
           if (m && m.name === mat.name) {
-            // Convert to MeshPhysicalMaterial for clearcoat support
-            const physMat = new THREE.MeshPhysicalMaterial({
-              map: tex,
-              color: m.color,
-              roughness: 0.08,
-              metalness: 0.0,
-              clearcoat: 1.0,
-              clearcoatRoughness: 0.03,
-              envMap: scene.environment,
-              envMapIntensity: 1.5,
-              transparent: false,
-            });
-            physMat.name = m.name; // Keep the name
-            // Replace material on child
-            if (Array.isArray(child.material)) {
-              child.material[idx] = physMat;
+            // Chọn material dựa trên loại sản phẩm
+            let newMat;
+            if (isLeatherProduct() && textureMaps) {
+              newMat = createLeatherMaterial(tex, m.color, textureMaps);
+              console.log("[Material] Created LEATHER material for:", mat.name);
             } else {
-              child.material = physMat;
+              newMat = createStandardMaterial(tex, m.color);
+              console.log("[Material] Created STANDARD material for:", mat.name);
+            }
+            newMat.name = m.name;
+            if (Array.isArray(child.material)) {
+              child.material[idx] = newMat;
+            } else {
+              child.material = newMat;
             }
           }
         });
       });
-      return; // continue to next material
+      return;
     }
 
     // Use ACTUAL UV bounds from mesh geometry for the "outside" material
@@ -1368,29 +1512,34 @@ function redrawImage() {
 
     console.log("[redrawImage] Created texture for material:", mat.name, "canvas size:", canvas.width, "x", canvas.height);
 
+    // ===== TẠO MATERIAL DỰA TRÊN LOẠI SẢN PHẨM =====
+    let textureMaps = null;
+    if (isLeatherProduct()) {
+      textureMaps = createLeatherTextureMaps(canvas.width, canvas.height);
+      createdTextures.push(textureMaps.roughnessTexture);
+      createdTextures.push(textureMaps.clearcoatTexture);
+      createdTextures.push(textureMaps.normalTexture);
+    }
+
     loadedModel.traverse((child) => {
       if (!child.isMesh) return;
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       mats.forEach((m, idx) => {
         if (m && m.name === mat.name) {
-          // Convert to MeshPhysicalMaterial for clearcoat support
-          const physMat = new THREE.MeshPhysicalMaterial({
-            map: tex,
-            color: m.color,
-            roughness: 0.08,
-            metalness: 0.0,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.03,
-            envMap: scene.environment,
-            envMapIntensity: 1.5,
-            transparent: false,
-          });
-          physMat.name = m.name; // Keep the name
-          // Replace material on child
-          if (Array.isArray(child.material)) {
-            child.material[idx] = physMat;
+          // Chọn material dựa trên loại sản phẩm
+          let newMat;
+          if (isLeatherProduct() && textureMaps) {
+            newMat = createLeatherMaterial(tex, m.color, textureMaps);
+            console.log("[Material] Created LEATHER material for:", mat.name);
           } else {
-            child.material = physMat;
+            newMat = createStandardMaterial(tex, m.color);
+            console.log("[Material] Created STANDARD material for:", mat.name);
+          }
+          newMat.name = m.name;
+          if (Array.isArray(child.material)) {
+            child.material[idx] = newMat;
+          } else {
+            child.material = newMat;
           }
         }
       });
@@ -1554,19 +1703,20 @@ function loadGLBFromURL(urlOrFile) {
 
     scene.add(loadedModel);
 
-    // Adjust camera for cue model - focus on customizable area (bottom half)
-    if (isCueModel) {
-      // Cue is VERTICAL: tip at top, bumper at bottom
-      // Custom area is lower half, so focus camera there
-      camera.position.set(1.2, -0.3, 1.2); // Side view, slightly below center
-      controls.target.set(0, -0.3, 0); // Focus on lower/custom section
-      controls.update();
-    } else {
-      // Default camera for other models
-      camera.position.set(0, 1.8, 4);
-      controls.target.set(0, 0, 0);
-      controls.update();
-    }
+    // Tính lại bounding box SAU KHI model đã được positioned
+    const finalBox = new THREE.Box3().setFromObject(loadedModel);
+    const modelCenter = finalBox.getCenter(new THREE.Vector3());
+    
+    // Camera nhìn vào tâm model
+    camera.position.set(
+      modelCenter.x + 1.5,
+      modelCenter.y,
+      modelCenter.z + 1.5
+    );
+    
+    // OrbitControls xoay quanh TÂM THỰC SỰ của model
+    controls.target.copy(modelCenter);
+    controls.update();
 
     // build base canvases now that model is present (so mat.map.image is likely ready)
     buildPerMaterialBounds();
@@ -1667,6 +1817,10 @@ function getUrlParams() {
 // No rotation or scaling needed - it should fill the UV space exactly
 function loadDefaultSurface() {
   const { surfaceUrl } = getUrlParams();
+  
+  // Lấy đường dẫn surface dựa trên loại sản phẩm
+  const defaultSurfacePath = getSurfacePath();
+  console.log("[Texture] Product surface path:", defaultSurfacePath);
 
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -1679,7 +1833,7 @@ function loadDefaultSurface() {
   img.onerror = (e) => {
     console.error("[Texture] Failed to load surface texture:", e);
     // If custom surface fails, try fallback to default
-    if (surfaceUrl && img.src !== "./surface.jpg") {
+    if (img.src !== "./surface.jpg") {
       console.log("[Texture] Trying fallback to default surface.jpg");
       img.src = "./surface.jpg";
     } else {
@@ -1687,13 +1841,13 @@ function loadDefaultSurface() {
     }
   };
 
-  // Use Shopify metafield URL if provided, otherwise use default
+  // Use Shopify metafield URL if provided, otherwise use product-specific surface
   if (surfaceUrl) {
     console.log("[Texture] Loading surface from Shopify:", surfaceUrl);
     img.src = surfaceUrl;
   } else {
-    console.log("[Texture] No surface URL provided, using default surface.jpg");
-    img.src = "./surface.jpg";
+    console.log("[Texture] Loading surface:", defaultSurfacePath);
+    img.src = defaultSurfacePath;
   }
 }
 
@@ -1706,44 +1860,120 @@ function loadModelAndSurface() {
     (gltf) => {
       loadedModel = gltf.scene;
 
+      // Scale model để vừa với viewport
       const box = new THREE.Box3().setFromObject(loadedModel);
       const size = box.getSize(new THREE.Vector3());
       const scale = 2.0 / Math.max(size.x, size.y, size.z);
       loadedModel.scale.setScalar(scale);
+      
+      // KHÔNG dịch chuyển model ở đây - sẽ center sau khi add vào scene
 
-      box.setFromObject(loadedModel);
-      const center = box.getCenter(new THREE.Vector3());
-      loadedModel.position.sub(center);
-      loadedModel.position.y -= 0.5;
+      // Log tất cả material names để debug
+      console.log("=".repeat(50));
+      console.log("[Model] All materials in model:");
+      loadedModel.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach(m => {
+            console.log(`  Mesh: "${child.name}" | Material: "${m.name}"`);
+          });
+        }
+      });
+      console.log("=".repeat(50));
 
       loadedModel.traverse((child) => {
         if (child.isMesh && child.material) {
-          originalMaterials.set(child.uuid, child.material.clone());
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          
+          mats.forEach((mat, idx) => {
+            originalMaterials.set(child.uuid + "_" + idx, mat.clone());
 
-          // Upgrade existing material properties for mirror-like lacquer finish
-          // Keep the SAME material object (preserves uuid for redrawImage matching)
-          const mat = child.material;
-          mat.envMap = scene.environment;
-          mat.envMapIntensity = 1.5;      // Strong reflections
-          mat.roughness = 0.08;           // Very smooth for mirror reflections
-          mat.metalness = 0.0;            // Non-metallic
+            // Kiểm tra xem có phải rubber material (bumper) không - check cả mesh name
+            if (isLeatherProduct() && isRubberMaterial(mat.name, child.name)) {
+              console.log(`[Rubber] Found rubber: mesh="${child.name}" material="${mat.name}"`);
+              // Sẽ apply rubber material trong redrawImage sau khi load normal maps
+            }
+            
+            // Kiểm tra xem có phải top cap material không
+            if (isLeatherProduct() && isTopCapMaterial(mat.name, child.name)) {
+              console.log(`[TopCap] Found top cap: mesh="${child.name}" material="${mat.name}"`);
+              // Sẽ apply top cap logo trong redrawImage sau khi load logo
+            }
 
-          // Add clearcoat if material supports it (MeshPhysicalMaterial)
-          // If it's MeshStandardMaterial, these properties still work but clearcoat won't
-          if (mat.isMeshStandardMaterial) {
-            mat.clearcoat = 1.0;            // Full clearcoat layer (lacquer)
-            mat.clearcoatRoughness = 0.03;  // Ultra-smooth clearcoat
-            mat.reflectivity = 1.0;
-          }
-          mat.needsUpdate = true;
+            // Upgrade existing material properties for mirror-like lacquer finish
+            mat.envMap = scene.environment;
+            mat.envMapIntensity = 1.5;
+            mat.roughness = 0.08;
+            mat.metalness = 0.0;
+
+            if (mat.isMeshStandardMaterial) {
+              mat.clearcoat = 1.0;
+              mat.clearcoatRoughness = 0.03;
+              mat.reflectivity = 1.0;
+            }
+            mat.needsUpdate = true;
+          });
         }
       });
 
+      // ===== ĐẶT MODEL VỀ GỐC TỌA ĐỘ - XOAY QUANH TRỤC CỦA NÓ =====
+      // Tính bounding box và center model chính xác về gốc tọa độ
+      const centerBox = new THREE.Box3().setFromObject(loadedModel);
+      const centerPoint = centerBox.getCenter(new THREE.Vector3());
+      
+      // Di chuyển model để TÂM của nó nằm ở gốc tọa độ (0,0,0)
+      loadedModel.position.set(-centerPoint.x, -centerPoint.y, -centerPoint.z);
+      
       scene.add(loadedModel);
 
-      // Adjust camera for cue model - focus on customizable area
-      camera.position.set(1.2, -0.3, 1.2);
-      controls.target.set(0, -0.3, 0);
+      // ===== RECT AREA LIGHTS - VỆT SÁNG RỘNG NHƯ STUDIO SOFTBOX =====
+      // RectAreaLight tạo vệt sáng mềm, rộng giống softbox trong studio
+      
+      // Strip light chính - bên phải (vệt sáng dọc rộng)
+      const stripRight = new THREE.RectAreaLight(0xffffff, 5, 1.0, 5);
+      stripRight.position.set(2, 0, 1);
+      stripRight.lookAt(0, 0, 0);
+      camera.add(stripRight);
+      
+      // Strip light phụ - bên trái
+      const stripLeft = new THREE.RectAreaLight(0xffffff, 4, 0.8, 4.5);
+      stripLeft.position.set(-1.8, 0, 1);
+      stripLeft.lookAt(0, 0, 0);
+      camera.add(stripLeft);
+      
+      // Strip light trên
+      const stripTop = new THREE.RectAreaLight(0xffffff, 4.5, 4, 0.8);
+      stripTop.position.set(0, 2, 1);
+      stripTop.lookAt(0, 0, 0);
+      camera.add(stripTop);
+      
+      // Strip light dưới
+      const stripBottom = new THREE.RectAreaLight(0xffffff, 3.5, 3.5, 0.6);
+      stripBottom.position.set(0, -1.8, 1);
+      stripBottom.lookAt(0, 0, 0);
+      camera.add(stripBottom);
+      
+      // Đèn góc chéo - tạo highlight ở các góc
+      const stripNE = new THREE.RectAreaLight(0xffffff, 2.5, 0.6, 2.5);
+      stripNE.position.set(1.5, 1.5, 1);
+      stripNE.lookAt(0, 0, 0);
+      camera.add(stripNE);
+      
+      const stripSW = new THREE.RectAreaLight(0xffffff, 2.2, 0.6, 2.5);
+      stripSW.position.set(-1.3, -1.3, 1);
+      stripSW.lookAt(0, 0, 0);
+      camera.add(stripSW);
+      
+      // QUAN TRỌNG: Thêm camera vào scene
+      scene.add(camera);
+      
+      console.log("[Lighting] 6 RectAreaLight - vệt sáng rộng như studio");
+
+      // Camera nhìn vào tâm model (giờ là gốc tọa độ 0,0,0)
+      camera.position.set(2, 0, 2);
+      
+      // OrbitControls xoay quanh GỐC TỌA ĐỘ = TÂM CỦA GẬY
+      controls.target.set(0, 0, 0);
       controls.update();
 
       console.log("[Model] Loaded successfully");
@@ -2201,9 +2431,38 @@ if (editOverlay) {
   editOverlay.addEventListener("mouseleave", onEditOverlayMouseUp);
 }
 
+// ===== AUTO ROTATE CUE =====
+// Xoay toàn bộ model (gậy) quanh trục Y
+// Set autoRotateEnabled = false nếu muốn tắt xoay mặc định
+let autoRotateEnabled = true;      // <<< BẬT/TẮT xoay ở đây
+let autoRotateSpeed = 0.4;         // tốc độ rad/giây (~23°/s)
+
+// Cho phép code khác (UI) điều khiển nếu cần
+export function setAutoRotate(enabled) {
+  autoRotateEnabled = enabled;
+}
+
+export function setAutoRotateSpeed(speed) {
+  autoRotateSpeed = speed;
+}
+
+// Lưu thời gian frame trước để tính delta time
+let lastTime = 0;
+
 // ===== RENDER LOOP =====
-function animate() {
+function animate(time) {
   requestAnimationFrame(animate);
+
+  const t = (time || 0) * 0.001;   // ms -> seconds
+  const dt = t - lastTime;
+  lastTime = t;
+
+  // Xoay gậy nếu bật auto-rotate và model đã load
+  if (autoRotateEnabled && loadedModel) {
+    // Xoay quanh trục Y (gậy quay tròn liên tục)
+    loadedModel.rotation.y += autoRotateSpeed * dt;
+  }
+
   controls.update();
   renderer.render(scene, camera);
 
