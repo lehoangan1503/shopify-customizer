@@ -6,14 +6,7 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 
 // ===== IMPORT MODULES =====
-import { 
-  getCurrentProduct, 
-  getProductGLBPath,
-  getSurfacePath,
-  isLeatherProduct, 
-  logCurrentProduct,
-  PRODUCT_TYPES 
-} from "./product-config.js";
+import { getCurrentProduct, getProductGLBPath, getSurfacePath, isLeatherProduct, logCurrentProduct, PRODUCT_TYPES } from "./product-config.js";
 
 import {
   LEATHER_CONFIG,
@@ -32,7 +25,6 @@ import {
   createTopCapRoughnessMapWithLogo,
 } from "./leather-material.js";
 // (rollback) bỏ tính UV bounds tự động cho mặt nắp
-
 
 // ===== PRODUCT CONFIGURATION =====
 const currentProduct = getCurrentProduct();
@@ -93,7 +85,7 @@ const rgbeLoader = new RGBELoader();
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.enablePan = true;       // BẬT PAN để có thể di chuyển dọc
+controls.enablePan = true; // BẬT PAN để có thể di chuyển dọc
 controls.panSpeed = 0.8;
 controls.rotateSpeed = 0.8;
 controls.zoomSpeed = 1.0;
@@ -103,7 +95,7 @@ controls.minDistance = 0.5;
 controls.maxDistance = 10;
 
 // CHỈ CHO PHÉP PAN DỌC (Y) - giữ X và Z cố định để xoay quanh trục gậy
-controls.addEventListener('change', () => {
+controls.addEventListener("change", () => {
   // Giữ target.x và target.z ở 0 (trục gậy)
   // Chỉ cho phép target.y thay đổi (di chuyển lên/xuống)
   controls.target.x = 0;
@@ -115,7 +107,7 @@ const DARK_BG = 0x2a2a2a;
 const LIGHT_BG = 0xf2f4f8;
 
 // Listen for background toggle from UI
-window.addEventListener('toggle-background', (e) => {
+window.addEventListener("toggle-background", (e) => {
   const isDark = e.detail.dark;
   scene.background = new THREE.Color(isDark ? DARK_BG : LIGHT_BG);
 });
@@ -425,8 +417,7 @@ async function exportForPrint() {
       const matName = (mat?.name || "").toLowerCase();
 
       // Check both mesh name AND material name (consistent with buildPerMaterialBounds)
-      const isTargetMaterial = meshName.includes("outside") || matName.includes("outside") ||
-                               meshName.includes("butt_body") || matName.includes("butt_body");
+      const isTargetMaterial = meshName.includes("outside") || matName.includes("outside") || meshName.includes("butt_body") || matName.includes("butt_body");
 
       if (isTargetMaterial && perMaterialBounds.has(mat.uuid)) {
         const info = perMaterialBounds.get(mat.uuid);
@@ -438,7 +429,7 @@ async function exportForPrint() {
             minU: bounds.minU,
             minV: bounds.minV,
             maxU: bounds.maxU,
-            maxV: bounds.maxV
+            maxV: bounds.maxV,
           };
           textureDimensions = { origTexWidth, origTexHeight };
           console.log("[exportForPrint] Found UV bounds for mesh:", child.name, "material:", mat.name);
@@ -451,7 +442,10 @@ async function exportForPrint() {
 
   // Fallback: if not found in perMaterialBounds, calculate from mesh geometry
   if (!uvBounds) {
-    let minU = Infinity, minV = Infinity, maxU = -Infinity, maxV = -Infinity;
+    let minU = Infinity,
+      minV = Infinity,
+      maxU = -Infinity,
+      maxV = -Infinity;
 
     loadedModel.traverse((child) => {
       if (!child.isMesh) return;
@@ -460,8 +454,7 @@ async function exportForPrint() {
 
       mats.forEach((mat) => {
         const matName = (mat?.name || "").toLowerCase();
-        const isTargetMaterial = meshName.includes("outside") || matName.includes("outside") ||
-                                 meshName.includes("butt_body") || matName.includes("butt_body");
+        const isTargetMaterial = meshName.includes("outside") || matName.includes("outside") || meshName.includes("butt_body") || matName.includes("butt_body");
         if (!isTargetMaterial) return;
 
         const geom = child.geometry;
@@ -496,7 +489,7 @@ async function exportForPrint() {
           minU: bounds.minU,
           minV: bounds.minV,
           maxU: bounds.maxU,
-          maxV: bounds.maxV
+          maxV: bounds.maxV,
         };
         textureDimensions = { origTexWidth, origTexHeight };
         console.log("[exportForPrint] Using fallback UV bounds:", uvBounds);
@@ -522,7 +515,7 @@ async function exportForPrint() {
     cropX: cropX.toFixed(0),
     cropY: cropY.toFixed(0),
     cropW: cropW.toFixed(0),
-    cropH: cropH.toFixed(0)
+    cropH: cropH.toFixed(0),
   });
 
   // Step 4: Calculate output dimensions with CORRECT aspect ratio
@@ -536,12 +529,8 @@ async function exportForPrint() {
   // cropW x cropH on the square canvas actually has a different true aspect ratio.
 
   // Get original texture dimensions (fallback to stored global or canvas size)
-  const origTexWidth = textureDimensions?.origTexWidth ||
-                       originalTextureDimensions?.width ||
-                       CANVAS_SIZE;
-  const origTexHeight = textureDimensions?.origTexHeight ||
-                        originalTextureDimensions?.height ||
-                        CANVAS_SIZE;
+  const origTexWidth = textureDimensions?.origTexWidth || originalTextureDimensions?.width || CANVAS_SIZE;
+  const origTexHeight = textureDimensions?.origTexHeight || originalTextureDimensions?.height || CANVAS_SIZE;
 
   // Warn if using fallback dimensions - this might indicate the surface.jpg dimensions weren't captured
   if (!textureDimensions && origTexWidth === CANVAS_SIZE && origTexHeight === CANVAS_SIZE) {
@@ -561,7 +550,7 @@ async function exportForPrint() {
   console.log("[exportForPrint] UV region in original pixels:", {
     width: originalRegionWidth.toFixed(0),
     height: originalRegionHeight.toFixed(0),
-    aspectRatio: (originalRegionWidth / originalRegionHeight).toFixed(4)
+    aspectRatio: (originalRegionWidth / originalRegionHeight).toFixed(4),
   });
 
   // Step 5: Create output canvas with EXACT original texture dimensions
@@ -583,8 +572,7 @@ async function exportForPrint() {
     console.log("[exportForPrint] Scaled down due to canvas limits, scale:", scale.toFixed(4));
   }
 
-  console.log("[exportForPrint] Output dimensions:", outputWidth, "x", outputHeight,
-              "aspect:", (outputWidth / outputHeight).toFixed(4));
+  console.log("[exportForPrint] Output dimensions:", outputWidth, "x", outputHeight, "aspect:", (outputWidth / outputHeight).toFixed(4));
 
   // Step 6: Create output canvas and draw cropped region
   const outputCanvas = document.createElement("canvas");
@@ -596,8 +584,14 @@ async function exportForPrint() {
   // This effectively "un-stretches" the texture back to correct proportions
   outputCtx.drawImage(
     fullCanvas,
-    cropX, cropY, cropW, cropH,  // Source rectangle (from square canvas)
-    0, 0, outputWidth, outputHeight  // Destination (output canvas with correct aspect)
+    cropX,
+    cropY,
+    cropW,
+    cropH, // Source rectangle (from square canvas)
+    0,
+    0,
+    outputWidth,
+    outputHeight // Destination (output canvas with correct aspect)
   );
 
   console.log("[exportForPrint] Export complete - canvas ready for print production");
@@ -1191,48 +1185,43 @@ async function redrawImage() {
     console.log("[redrawImage] Skipping - loadedModel:", !!loadedModel, "perMaterialBounds.size:", perMaterialBounds.size);
     return;
   }
-  
+
   // Load tất cả normal maps nếu là sản phẩm có da/cao su
   if (isLeatherProduct()) {
     await loadAllNormalMaps();
     console.log("[redrawImage] Leather product - all normal maps ready");
-    
+
     // Apply rubber material cho các material bumper/bottom
     // Nếu mesh name match -> apply cho TẤT CẢ materials trên mesh đó
     loadedModel.traverse((child) => {
       if (!child.isMesh || !child.material) return;
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       const meshName = child.name || "";
-      
+
       // Check xem mesh có phải là rubber mesh không
-      const isMeshRubber = RUBBER_CONFIG.materialNames.some(n => 
-        meshName.toLowerCase().includes(n.toLowerCase())
-      );
-      
+      const isMeshRubber = RUBBER_CONFIG.materialNames.some((n) => meshName.toLowerCase().includes(n.toLowerCase()));
+
       mats.forEach((mat, idx) => {
         const isMatRubber = isRubberMaterial(mat.name, "");
         const matNameLower = (mat.name || "").toLowerCase();
-        
+
         // Detect xem đây có phải material logo không
         // Material.003 hoặc chứa "logo", "badge", "emblem"
-        const isLogoMaterial = matNameLower.includes("material.003") || 
-                               matNameLower.includes("logo") ||
-                               matNameLower.includes("badge") ||
-                               matNameLower.includes("emblem");
-        
+        const isLogoMaterial = matNameLower.includes("material.003") || matNameLower.includes("logo") || matNameLower.includes("badge") || matNameLower.includes("emblem");
+
         // Apply rubber nếu mesh name HOẶC material name match
         if (isMeshRubber || isMatRubber) {
           console.log(`[Rubber] Applying rubber to: mesh="${meshName}" material="${mat.name}" isLogo=${isLogoMaterial}`);
           const rubberMat = createRubberMaterial(mat.map, mat.color, 1024, 1024, isLogoMaterial);
           rubberMat.name = mat.name;
-          
+
           if (Array.isArray(child.material)) {
             child.material[idx] = rubberMat;
           } else {
             child.material = rubberMat;
           }
         }
-        
+
         // Apply top cap logo nếu mesh name HOẶC material name match
         const isTopCap = isTopCapMaterial(mat.name, meshName);
         if (isTopCap) {
@@ -1240,7 +1229,7 @@ async function redrawImage() {
           // Tạo texture với logo (theo config tâm mặt trên)
           const logoTexture = createTopCapTextureWithLogo(mat.map, 1024, 1024);
           const roughnessTex = createTopCapRoughnessMapWithLogo(1024, 1024);
-          
+
           // Tạo material mới với logo - GIỮ NGUYÊN properties từ material gốc
           // KHÔNG dùng normal map với emboss - logo phẳng như khắc laser
           // Chất liệu NHỰA mờ với khắc laser (logo phẳng, sáng xám)
@@ -1261,7 +1250,7 @@ async function redrawImage() {
             transparent: false,
           });
           topCapMat.name = mat.name;
-          
+
           if (Array.isArray(child.material)) {
             child.material[idx] = topCapMat;
           } else {
@@ -1271,7 +1260,7 @@ async function redrawImage() {
       });
     });
   }
-  
+
   console.log("[redrawImage] Starting redraw with", imageLayers.length, "layers (per-layer fitMode)");
 
   clearCreatedTextures();
@@ -1357,13 +1346,31 @@ async function redrawImage() {
       const rectW = uvBounds.width * canvas.width;
       const rectH = uvBounds.height * canvas.height;
 
-      console.log("[redrawImage] Layer:", layer.name, "fitMode:", layerFitMode, "drawing region - rectX:", rectX.toFixed(0), "rectY:", rectY.toFixed(0), "rectW:", rectW.toFixed(0), "rectH:", rectH.toFixed(0));
+      console.log(
+        "[redrawImage] Layer:",
+        layer.name,
+        "fitMode:",
+        layerFitMode,
+        "drawing region - rectX:",
+        rectX.toFixed(0),
+        "rectY:",
+        rectY.toFixed(0),
+        "rectW:",
+        rectW.toFixed(0),
+        "rectH:",
+        rectH.toFixed(0)
+      );
       console.log("[redrawImage] Layer transform - scale:", tr.scale, "offsetX:", tr.offsetX, "offsetY:", tr.offsetY, "rotation:", tr.rotation);
 
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(rectX, rectY, rectW, rectH);
-      ctx.clip();
+
+      // For "stretch" mode (Surface layer), draw to FULL canvas - surface.jpg covers entire UV layout
+      // For other modes (overlay layers), clip to UV bounds region only
+      if (layerFitMode !== "stretch") {
+        ctx.beginPath();
+        ctx.rect(rectX, rectY, rectW, rectH);
+        ctx.clip();
+      }
 
       // Texture fills based on per-layer fitMode
       const imgAspect = img.width / img.height;
@@ -1399,19 +1406,25 @@ async function redrawImage() {
       const trueRectAspect = (rectW / rectH) * distortionFactor;
 
       console.log("[redrawImage] Original texture:", baseTexWidth, "x", baseTexHeight, "aspect:", baseTexAspect.toFixed(3));
-      console.log("[redrawImage] Aspect ratios - img:", imgAspect.toFixed(3),
-        "rectOnCanvas:", (rectW/rectH).toFixed(3),
-        "distortionFactor:", distortionFactor.toFixed(3),
-        "trueRectAspect:", trueRectAspect.toFixed(3));
+      console.log(
+        "[redrawImage] Aspect ratios - img:",
+        imgAspect.toFixed(3),
+        "rectOnCanvas:",
+        (rectW / rectH).toFixed(3),
+        "distortionFactor:",
+        distortionFactor.toFixed(3),
+        "trueRectAspect:",
+        trueRectAspect.toFixed(3)
+      );
 
       let drawW, drawH;
 
       if (layerFitMode === "stretch") {
-        // Stretch mode: 1:1 UV mapping, image fills exact UV bounds
-        // This matches Blender's UV layout exactly - no aspect ratio preservation
-        // Used for base surface textures designed to match UV layout
-        drawW = rectW;
-        drawH = rectH;
+        // Stretch mode: surface.jpg fills ENTIRE canvas (full UV 0-1 range)
+        // The surface texture is pre-designed to match the complete UV layout
+        // No clipping, no UV bounds restriction - draw to full canvas
+        drawW = canvas.width;
+        drawH = canvas.height;
       } else if (layerFitMode === "cover") {
         // Cover mode: fill entire rect, may crop
         // Use true rect aspect for correct proportions
@@ -1419,7 +1432,7 @@ async function redrawImage() {
           // Image wider than true rect - fit height, crop width
           // But we draw on the distorted canvas, so scale accordingly
           drawH = rectH;
-          drawW = rectH * imgAspect / distortionFactor;
+          drawW = (rectH * imgAspect) / distortionFactor;
         } else {
           // Image taller than true rect - fit width, crop height
           drawW = rectW;
@@ -1456,7 +1469,7 @@ async function redrawImage() {
           // Image is taller/equal - constrained by height in true space
           // On canvas: draw wider to compensate for vertical stretch
           drawH = rectH;
-          drawW = rectH * imgAspect / distortionFactor;
+          drawW = (rectH * imgAspect) / distortionFactor;
         }
 
         // Clamp to rect bounds (in case compensation pushes outside)
@@ -1474,21 +1487,43 @@ async function redrawImage() {
 
       console.log("[redrawImage] Draw dimensions - drawW:", drawW.toFixed(0), "drawH:", drawH.toFixed(0));
 
-      // Compute draw position with per-layer offsets (relative to rectangle)
-      // Center the image within the rect, then apply offsets
-      const baseX = rectX + (rectW - drawW) / 2;
-      const baseY = rectY + (rectH - drawH) / 2;
-      const drawX = baseX + tr.offsetX * rectW;
-      const drawY = baseY + tr.offsetY * rectH;
+      // For stretch mode, draw to full canvas at origin (no centering/offset needed)
+      // For other modes, center image within UV rect and apply per-layer offsets
+      let drawX, drawY;
+      if (layerFitMode === "stretch") {
+        // Stretch mode: draw at (0,0) to fill entire canvas
+        drawX = 0;
+        drawY = 0;
+      } else {
+        // Compute draw position with per-layer offsets (relative to rectangle)
+        // Center the image within the rect, then apply offsets
+        const baseX = rectX + (rectW - drawW) / 2;
+        const baseY = rectY + (rectH - drawH) / 2;
+        drawX = baseX + tr.offsetX * rectW;
+        drawY = baseY + tr.offsetY * rectH;
+      }
 
-      // Apply rotation & scale around rectangle center
-      // Support both uniform scale and non-uniform scaleX/scaleY
-      const scaleX = tr.scaleX !== undefined ? tr.scaleX : (tr.scale || 1);
-      const scaleY = tr.scaleY !== undefined ? tr.scaleY : (tr.scale || 1);
-      ctx.translate(rectX + rectW / 2, rectY + rectH / 2);
-      ctx.rotate(tr.rotation || 0);
-      ctx.scale(scaleX, scaleY);
-      ctx.translate(-(rectX + rectW / 2), -(rectY + rectH / 2));
+      // Apply rotation & scale around the appropriate center
+      // For stretch mode: center is canvas center (full canvas transform)
+      // For other modes: center is UV rect center
+      const scaleX = tr.scaleX !== undefined ? tr.scaleX : tr.scale || 1;
+      const scaleY = tr.scaleY !== undefined ? tr.scaleY : tr.scale || 1;
+
+      if (layerFitMode === "stretch") {
+        // Transform around canvas center for full-canvas surface texture
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate(tr.rotation || 0);
+        ctx.scale(scaleX, scaleY);
+        ctx.translate(-centerX, -centerY);
+      } else {
+        // Transform around UV rect center for overlay layers
+        ctx.translate(rectX + rectW / 2, rectY + rectH / 2);
+        ctx.rotate(tr.rotation || 0);
+        ctx.scale(scaleX, scaleY);
+        ctx.translate(-(rectX + rectW / 2), -(rectY + rectH / 2));
+      }
 
       // Draw the layer image
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
@@ -1562,9 +1597,7 @@ function updateSliders() {
   document.getElementById("offsetX").value = t.offsetX;
   document.getElementById("offsetY").value = t.offsetY;
   // Use uniform scale if scaleX/scaleY not set, or average of both
-  const scaleValue = t.scaleX !== undefined && t.scaleY !== undefined
-    ? (t.scaleX + t.scaleY) / 2
-    : (t.scale || 1);
+  const scaleValue = t.scaleX !== undefined && t.scaleY !== undefined ? (t.scaleX + t.scaleY) / 2 : t.scale || 1;
   document.getElementById("scale").value = scaleValue;
   document.getElementById("rotation").value = (t.rotation * 180) / Math.PI;
 
@@ -1686,15 +1719,15 @@ function loadGLBFromURL(urlOrFile) {
         // Keep the SAME material object (preserves uuid for redrawImage matching)
         const mat = child.material;
         mat.envMap = scene.environment;
-        mat.envMapIntensity = 1.5;      // Strong reflections
-        mat.roughness = 0.08;           // Very smooth for mirror reflections
-        mat.metalness = 0.0;            // Non-metallic
+        mat.envMapIntensity = 1.5; // Strong reflections
+        mat.roughness = 0.08; // Very smooth for mirror reflections
+        mat.metalness = 0.0; // Non-metallic
 
         // Add clearcoat if material supports it (MeshPhysicalMaterial)
         // If it's MeshStandardMaterial, these properties still work but clearcoat won't
         if (mat.isMeshStandardMaterial) {
-          mat.clearcoat = 1.0;            // Full clearcoat layer (lacquer)
-          mat.clearcoatRoughness = 0.03;  // Ultra-smooth clearcoat
+          mat.clearcoat = 1.0; // Full clearcoat layer (lacquer)
+          mat.clearcoatRoughness = 0.03; // Ultra-smooth clearcoat
           mat.reflectivity = 1.0;
         }
         mat.needsUpdate = true;
@@ -1706,14 +1739,10 @@ function loadGLBFromURL(urlOrFile) {
     // Tính lại bounding box SAU KHI model đã được positioned
     const finalBox = new THREE.Box3().setFromObject(loadedModel);
     const modelCenter = finalBox.getCenter(new THREE.Vector3());
-    
+
     // Camera nhìn vào tâm model
-    camera.position.set(
-      modelCenter.x + 1.5,
-      modelCenter.y,
-      modelCenter.z + 1.5
-    );
-    
+    camera.position.set(modelCenter.x + 1.5, modelCenter.y, modelCenter.z + 1.5);
+
     // OrbitControls xoay quanh TÂM THỰC SỰ của model
     controls.target.copy(modelCenter);
     controls.update();
@@ -1780,7 +1809,7 @@ function applyTextureWhenReady() {
   // This is the reference aspect ratio for correct overlay placement
   originalTextureDimensions = {
     width: surfaceImage.width,
-    height: surfaceImage.height
+    height: surfaceImage.height,
   };
   console.log("[Texture] Set original texture dimensions from surface.jpg:", originalTextureDimensions);
 
@@ -1817,7 +1846,7 @@ function getUrlParams() {
 // No rotation or scaling needed - it should fill the UV space exactly
 function loadDefaultSurface() {
   const { surfaceUrl } = getUrlParams();
-  
+
   // Lấy đường dẫn surface dựa trên loại sản phẩm
   const defaultSurfacePath = getSurfacePath();
   console.log("[Texture] Product surface path:", defaultSurfacePath);
@@ -1865,7 +1894,7 @@ function loadModelAndSurface() {
       const size = box.getSize(new THREE.Vector3());
       const scale = 2.0 / Math.max(size.x, size.y, size.z);
       loadedModel.scale.setScalar(scale);
-      
+
       // KHÔNG dịch chuyển model ở đây - sẽ center sau khi add vào scene
 
       // Log tất cả material names để debug
@@ -1874,7 +1903,7 @@ function loadModelAndSurface() {
       loadedModel.traverse((child) => {
         if (child.isMesh && child.material) {
           const mats = Array.isArray(child.material) ? child.material : [child.material];
-          mats.forEach(m => {
+          mats.forEach((m) => {
             console.log(`  Mesh: "${child.name}" | Material: "${m.name}"`);
           });
         }
@@ -1884,7 +1913,7 @@ function loadModelAndSurface() {
       loadedModel.traverse((child) => {
         if (child.isMesh && child.material) {
           const mats = Array.isArray(child.material) ? child.material : [child.material];
-          
+
           mats.forEach((mat, idx) => {
             originalMaterials.set(child.uuid + "_" + idx, mat.clone());
 
@@ -1893,7 +1922,7 @@ function loadModelAndSurface() {
               console.log(`[Rubber] Found rubber: mesh="${child.name}" material="${mat.name}"`);
               // Sẽ apply rubber material trong redrawImage sau khi load normal maps
             }
-            
+
             // Kiểm tra xem có phải top cap material không
             if (isLeatherProduct() && isTopCapMaterial(mat.name, child.name)) {
               console.log(`[TopCap] Found top cap: mesh="${child.name}" material="${mat.name}"`);
@@ -1920,58 +1949,58 @@ function loadModelAndSurface() {
       // Tính bounding box và center model chính xác về gốc tọa độ
       const centerBox = new THREE.Box3().setFromObject(loadedModel);
       const centerPoint = centerBox.getCenter(new THREE.Vector3());
-      
+
       // Di chuyển model để TÂM của nó nằm ở gốc tọa độ (0,0,0)
       loadedModel.position.set(-centerPoint.x, -centerPoint.y, -centerPoint.z);
-      
+
       scene.add(loadedModel);
 
       // ===== RECT AREA LIGHTS - VỆT SÁNG RỘNG NHƯ STUDIO SOFTBOX =====
       // RectAreaLight tạo vệt sáng mềm, rộng giống softbox trong studio
-      
+
       // Strip light chính - bên phải (vệt sáng dọc rộng)
       const stripRight = new THREE.RectAreaLight(0xffffff, 5, 1.0, 5);
       stripRight.position.set(2, 0, 1);
       stripRight.lookAt(0, 0, 0);
       camera.add(stripRight);
-      
+
       // Strip light phụ - bên trái
       const stripLeft = new THREE.RectAreaLight(0xffffff, 4, 0.8, 4.5);
       stripLeft.position.set(-1.8, 0, 1);
       stripLeft.lookAt(0, 0, 0);
       camera.add(stripLeft);
-      
+
       // Strip light trên
       const stripTop = new THREE.RectAreaLight(0xffffff, 4.5, 4, 0.8);
       stripTop.position.set(0, 2, 1);
       stripTop.lookAt(0, 0, 0);
       camera.add(stripTop);
-      
+
       // Strip light dưới
       const stripBottom = new THREE.RectAreaLight(0xffffff, 3.5, 3.5, 0.6);
       stripBottom.position.set(0, -1.8, 1);
       stripBottom.lookAt(0, 0, 0);
       camera.add(stripBottom);
-      
+
       // Đèn góc chéo - tạo highlight ở các góc
       const stripNE = new THREE.RectAreaLight(0xffffff, 2.5, 0.6, 2.5);
       stripNE.position.set(1.5, 1.5, 1);
       stripNE.lookAt(0, 0, 0);
       camera.add(stripNE);
-      
+
       const stripSW = new THREE.RectAreaLight(0xffffff, 2.2, 0.6, 2.5);
       stripSW.position.set(-1.3, -1.3, 1);
       stripSW.lookAt(0, 0, 0);
       camera.add(stripSW);
-      
+
       // QUAN TRỌNG: Thêm camera vào scene
       scene.add(camera);
-      
+
       console.log("[Lighting] 6 RectAreaLight - vệt sáng rộng như studio");
 
       // Camera nhìn vào tâm model (giờ là gốc tọa độ 0,0,0)
       camera.position.set(2, 0, 2);
-      
+
       // OrbitControls xoay quanh GỐC TỌA ĐỘ = TÂM CỦA GẬY
       controls.target.set(0, 0, 0);
       controls.update();
@@ -2045,8 +2074,8 @@ function getEditFrameBounds() {
 
   // Apply layer transform to frame position
   const tr = layer.transform;
-  const scaleX = tr.scaleX !== undefined ? tr.scaleX : (tr.scale || 1);
-  const scaleY = tr.scaleY !== undefined ? tr.scaleY : (tr.scale || 1);
+  const scaleX = tr.scaleX !== undefined ? tr.scaleX : tr.scale || 1;
+  const scaleY = tr.scaleY !== undefined ? tr.scaleY : tr.scale || 1;
 
   // Frame moves at 0.5x speed relative to layer movement on 3D model
   // This gives users more control range - frame stays in view while layer can move further
@@ -2063,7 +2092,7 @@ function getEditFrameBounds() {
     centerY: centerY + offsetPixelsY,
     rotation: tr.rotation || 0,
     baseWidth: frameWidth,
-    baseHeight: frameHeight
+    baseHeight: frameHeight,
   };
 }
 
@@ -2123,7 +2152,7 @@ function drawEditFrame() {
     { x: bounds.x, y: bounds.y }, // NW
     { x: bounds.x + bounds.width, y: bounds.y }, // NE
     { x: bounds.x, y: bounds.y + bounds.height }, // SW
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height } // SE
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height }, // SE
   ];
   corners.forEach((corner) => {
     overlayCtx.fillRect(corner.x - HANDLE_SIZE / 2, corner.y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
@@ -2135,7 +2164,7 @@ function drawEditFrame() {
     { x: bounds.x + bounds.width / 2, y: bounds.y }, // N
     { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height }, // S
     { x: bounds.x, y: bounds.y + bounds.height / 2 }, // W
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 } // E
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 }, // E
   ];
   edges.forEach((edge) => {
     overlayCtx.beginPath();
@@ -2194,7 +2223,7 @@ function hitTestEditFrame(x, y) {
     { x: bounds.x, y: bounds.y, mode: "scale-nw" },
     { x: bounds.x + bounds.width, y: bounds.y, mode: "scale-ne" },
     { x: bounds.x, y: bounds.y + bounds.height, mode: "scale-sw" },
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height, mode: "scale-se" }
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height, mode: "scale-se" },
   ];
   for (const corner of corners) {
     if (Math.hypot(rotX - corner.x, rotY - corner.y) < hitRadius) {
@@ -2207,7 +2236,7 @@ function hitTestEditFrame(x, y) {
     { x: bounds.x + bounds.width / 2, y: bounds.y, mode: "scale-n" },
     { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height, mode: "scale-s" },
     { x: bounds.x, y: bounds.y + bounds.height / 2, mode: "scale-w" },
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2, mode: "scale-e" }
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2, mode: "scale-e" },
   ];
   for (const edge of edges) {
     if (Math.hypot(rotX - edge.x, rotY - edge.y) < hitRadius) {
@@ -2241,7 +2270,7 @@ function updateCursor(mode) {
     "scale-s": "ns-resize",
     "scale-e": "ew-resize",
     "scale-w": "ew-resize",
-    rotate: "grab"
+    rotate: "grab",
   };
   editOverlay.style.cursor = cursors[mode] || "default";
 }
@@ -2350,8 +2379,8 @@ function onEditOverlayMouseMove(e) {
         const scaleFactor = currentDist / Math.max(startDist, 1);
 
         // Get the starting scaleX and scaleY (preserve individual values)
-        const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : (editDragStartTransform.scale || 1);
-        const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : (editDragStartTransform.scale || 1);
+        const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : editDragStartTransform.scale || 1;
+        const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : editDragStartTransform.scale || 1;
 
         // Apply same scale factor to both, preserving the ratio between them
         layer.transform.scaleX = Math.max(0.1, Math.min(5, baseScaleX * scaleFactor));
@@ -2368,7 +2397,7 @@ function onEditOverlayMouseMove(e) {
         const startDist = Math.abs(editDragStartY - bounds.centerY);
         const currentDist = Math.abs(y - bounds.centerY);
         const scaleFactor = currentDist / Math.max(startDist, 1);
-        const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : (editDragStartTransform.scale || 1);
+        const baseScaleY = editDragStartTransform.scaleY !== undefined ? editDragStartTransform.scaleY : editDragStartTransform.scale || 1;
         layer.transform.scaleY = Math.max(0.1, Math.min(5, baseScaleY * scaleFactor));
       }
       break;
@@ -2380,7 +2409,7 @@ function onEditOverlayMouseMove(e) {
         const startDist = Math.abs(editDragStartX - bounds.centerX);
         const currentDist = Math.abs(x - bounds.centerX);
         const scaleFactor = currentDist / Math.max(startDist, 1);
-        const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : (editDragStartTransform.scale || 1);
+        const baseScaleX = editDragStartTransform.scaleX !== undefined ? editDragStartTransform.scaleX : editDragStartTransform.scale || 1;
         layer.transform.scaleX = Math.max(0.1, Math.min(5, baseScaleX * scaleFactor));
       }
       break;
@@ -2434,8 +2463,8 @@ if (editOverlay) {
 // ===== AUTO ROTATE CUE =====
 // Xoay toàn bộ model (gậy) quanh trục Y
 // Set autoRotateEnabled = false nếu muốn tắt xoay mặc định
-let autoRotateEnabled = true;      // <<< BẬT/TẮT xoay ở đây
-let autoRotateSpeed = 0.4;         // tốc độ rad/giây (~23°/s)
+let autoRotateEnabled = true; // <<< BẬT/TẮT xoay ở đây
+let autoRotateSpeed = 0.4; // tốc độ rad/giây (~23°/s)
 
 // Cho phép code khác (UI) điều khiển nếu cần
 export function setAutoRotate(enabled) {
@@ -2453,7 +2482,7 @@ let lastTime = 0;
 function animate(time) {
   requestAnimationFrame(animate);
 
-  const t = (time || 0) * 0.001;   // ms -> seconds
+  const t = (time || 0) * 0.001; // ms -> seconds
   const dt = t - lastTime;
   lastTime = t;
 
@@ -2603,7 +2632,7 @@ async function orderNow() {
       // Try more aggressive compression
       console.log(`[Upload] Image still large (${(compressedBlob.size / 1024 / 1024).toFixed(1)}MB), applying stronger compression...`);
       setStatus("Applying stronger compression...");
-      const moreCompressed = await compressImageBlob(pngBlob, 0.70);
+      const moreCompressed = await compressImageBlob(pngBlob, 0.7);
 
       if (moreCompressed.size > maxSizeMB * 1024 * 1024) {
         throw new Error(`Image is too large (${(moreCompressed.size / 1024 / 1024).toFixed(1)}MB). Maximum size is ${maxSizeMB}MB. Try using fewer or smaller overlay images.`);
@@ -2625,7 +2654,6 @@ async function orderNow() {
 
     console.log("[Upload] Success:", url);
     finishOrder(url);
-
   } catch (e) {
     console.error("Order error:", e);
     alert("Error processing order:\n" + e.message);
