@@ -6,25 +6,10 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 
 // ===== IMPORT MODULES =====
-import { getCurrentProduct, getProductGLBPath, getSurfacePath, isLeatherProduct, logCurrentProduct, PRODUCT_TYPES } from "./product-config.js";
+import { getCurrentProduct, getProductGLBPath, getSurfacePath, isLeatherProduct, logCurrentProduct, PRODUCT_TYPES, SURFACE_TYPES, setActiveSurface } from "./product-config.js";
 
-import {
-  LEATHER_CONFIG,
-  RUBBER_CONFIG,
-  loadLeatherNormal,
-  loadRubberNormal,
-  loadAllNormalMaps,
-  createLeatherTextureMaps,
-  createLeatherMaterial,
-  createStandardMaterial,
-  isRubberMaterial,
-  createRubberMaterial,
-  isTopCapMaterial,
-  createTopCapTextureWithLogo,
-  createTopCapNormalWithLogo,
-  createTopCapRoughnessMapWithLogo,
-} from "./leather-material.js";
-// (rollback) bỏ tính UV bounds tự động cho mặt nắp
+import { createStandardMaterial, loadLeatherNormal, createNormalMap, LEATHER_CONFIG, LEATHER_TEXTURE_TYPES, LEATHER_COLOR_PALETTES } from "./leather-material.js";
+import { createLeatherSurface, createLeatherRoughnessMap, createLeatherClearcoatMap, LEATHER_FRAME } from "./leather-overlay.js";
 
 // ===== PRODUCT CONFIGURATION =====
 const currentProduct = getCurrentProduct();
@@ -63,6 +48,10 @@ scene.add(hemiLight);
 
 // ĐÈN CHÍNH (RectAreaLight) sẽ được gắn vào CAMERA trong loadModelAndSurface()
 // để tạo vệt sáng RỘNG và CỐ ĐỊNH khi xoay gậy
+
+// ===== LEATHER MATERIAL REFERENCE (for slider control) =====
+let leatherMaterialRef = null;
+
 // === Environment Map ===
 const rgbeLoader = new RGBELoader();
 // rgbeLoader.load(
@@ -1186,86 +1175,11 @@ async function redrawImage() {
     return;
   }
 
-  // Load tất cả normal maps nếu là sản phẩm có da/cao su
-  if (isLeatherProduct()) {
-    await loadAllNormalMaps();
-    console.log("[redrawImage] Leather product - all normal maps ready");
-
-    // Apply rubber material cho các material bumper/bottom
-    // Nếu mesh name match -> apply cho TẤT CẢ materials trên mesh đó
-    loadedModel.traverse((child) => {
-      if (!child.isMesh || !child.material) return;
-      const mats = Array.isArray(child.material) ? child.material : [child.material];
-      const meshName = child.name || "";
-
-      // Check xem mesh có phải là rubber mesh không
-      const isMeshRubber = RUBBER_CONFIG.materialNames.some((n) => meshName.toLowerCase().includes(n.toLowerCase()));
-
-      mats.forEach((mat, idx) => {
-        const isMatRubber = isRubberMaterial(mat.name, "");
-        const matNameLower = (mat.name || "").toLowerCase();
-
-        // Detect xem đây có phải material logo không
-        // Material.003 hoặc chứa "logo", "badge", "emblem"
-        const isLogoMaterial = matNameLower.includes("material.003") || matNameLower.includes("logo") || matNameLower.includes("badge") || matNameLower.includes("emblem");
-
-        // Apply rubber nếu mesh name HOẶC material name match
-        if (isMeshRubber || isMatRubber) {
-          console.log(`[Rubber] Applying rubber to: mesh="${meshName}" material="${mat.name}" isLogo=${isLogoMaterial}`);
-          const rubberMat = createRubberMaterial(mat.map, mat.color, 1024, 1024, isLogoMaterial);
-          rubberMat.name = mat.name;
-
-          if (Array.isArray(child.material)) {
-            child.material[idx] = rubberMat;
-          } else {
-            child.material = rubberMat;
-          }
-        }
-
-        // Apply top cap logo nếu mesh name HOẶC material name match
-        const isTopCap = isTopCapMaterial(mat.name, meshName);
-        if (isTopCap) {
-          console.log(`[TopCap] Applying logo to: mesh="${meshName}" material="${mat.name}"`);
-          // Tạo texture với logo (theo config tâm mặt trên)
-          const logoTexture = createTopCapTextureWithLogo(mat.map, 1024, 1024);
-          const roughnessTex = createTopCapRoughnessMapWithLogo(1024, 1024);
-
-          // Tạo material mới với logo - GIỮ NGUYÊN properties từ material gốc
-          // KHÔNG dùng normal map với emboss - logo phẳng như khắc laser
-          // Chất liệu NHỰA mờ với khắc laser (logo phẳng, sáng xám)
-          const topCapMat = new THREE.MeshPhysicalMaterial({
-            map: logoTexture,
-            color: new THREE.Color(0x1a1a1a), // nền đen nhựa
-            roughness: 0.6,
-            roughnessMap: roughnessTex,
-            metalness: 0.0,
-            clearcoat: 0.08,
-            clearcoatRoughness: 0.6,
-            reflectivity: 0.25,
-            ior: 1.45,
-            normalMap: mat.normalMap || null, // giữ normal gốc nếu phần nắp có vân riêng
-            normalScale: mat.normalScale || new THREE.Vector2(1, 1),
-            envMap: mat.envMap || scene.environment,
-            envMapIntensity: 0.4,
-            transparent: false,
-          });
-          topCapMat.name = mat.name;
-
-          if (Array.isArray(child.material)) {
-            child.material[idx] = topCapMat;
-          } else {
-            child.material = topCapMat;
-          }
-        }
-      });
-    });
-  }
-
   console.log("[redrawImage] Starting redraw with", imageLayers.length, "layers (per-layer fitMode)");
 
   clearCreatedTextures();
 
-  perMaterialBounds.forEach((info) => {
+  for (const [key, info] of perMaterialBounds) {
     const { mat, entries, baseCanvas, origTexWidth, origTexHeight } = info;
 
     // make working canvas from cached base
@@ -1290,25 +1204,73 @@ async function redrawImage() {
       tex.needsUpdate = true;
       createdTextures.push(tex);
 
-      // ===== TẠO MATERIAL DỰA TRÊN LOẠI SẢN PHẨM =====
-      let textureMaps = null;
+      // Create roughness, clearcoat, and normal maps for leather products
+      let roughnessTexture = null;
+      let clearcoatTexture = null;
+      let normalTexture = null;
       if (isLeatherProduct()) {
-        textureMaps = createLeatherTextureMaps(canvas.width, canvas.height);
-        createdTextures.push(textureMaps.roughnessTexture);
-        createdTextures.push(textureMaps.clearcoatTexture);
-        createdTextures.push(textureMaps.normalTexture);
+        // Roughness map: leather=matte, lacquer=glossy
+        const roughnessCanvas = createLeatherRoughnessMap(canvas.width, canvas.height);
+        roughnessTexture = new THREE.CanvasTexture(roughnessCanvas);
+        roughnessTexture.colorSpace = THREE.LinearSRGBColorSpace;
+        roughnessTexture.wrapS = THREE.RepeatWrapping;
+        roughnessTexture.wrapT = THREE.ClampToEdgeWrapping;
+        roughnessTexture.flipY = false;
+        roughnessTexture.needsUpdate = true;
+        createdTextures.push(roughnessTexture);
+
+        // Clearcoat map: leather=no clearcoat, lacquer=full clearcoat
+        const clearcoatCanvas = createLeatherClearcoatMap(canvas.width, canvas.height);
+        clearcoatTexture = new THREE.CanvasTexture(clearcoatCanvas);
+        clearcoatTexture.colorSpace = THREE.LinearSRGBColorSpace;
+        clearcoatTexture.wrapS = THREE.RepeatWrapping;
+        clearcoatTexture.wrapT = THREE.ClampToEdgeWrapping;
+        clearcoatTexture.flipY = false;
+        clearcoatTexture.needsUpdate = true;
+        createdTextures.push(clearcoatTexture);
+
+        // Normal map: creates 3D bumpy leather surface effect
+        await loadLeatherNormal(); // Ensure leather normal image is loaded
+        const normalCanvas = createNormalMap(canvas.width, canvas.height);
+        normalTexture = new THREE.CanvasTexture(normalCanvas);
+        normalTexture.colorSpace = THREE.LinearSRGBColorSpace;
+        normalTexture.wrapS = THREE.RepeatWrapping;
+        normalTexture.wrapT = THREE.ClampToEdgeWrapping;
+        normalTexture.flipY = false;
+        normalTexture.needsUpdate = true;
+        createdTextures.push(normalTexture);
+        console.log("[Leather] Normal map created for realistic 3D surface");
       }
 
+      // Apply material
       loadedModel.traverse((child) => {
         if (!child.isMesh) return;
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         mats.forEach((m, idx) => {
           if (m && m.name === mat.name) {
-            // Chọn material dựa trên loại sản phẩm
             let newMat;
-            if (isLeatherProduct() && textureMaps) {
-              newMat = createLeatherMaterial(tex, m.color, textureMaps);
-              console.log("[Material] Created LEATHER material for:", mat.name);
+            if (isLeatherProduct() && roughnessTexture && clearcoatTexture) {
+              // Leather: matte, no clearcoat, dark black with 3D normal bumps
+              // Lacquer: glossy, full clearcoat, reflective
+              newMat = new THREE.MeshPhysicalMaterial({
+                map: tex,
+                color: new THREE.Color(0xffffff), // Show texture as-is
+                roughnessMap: roughnessTexture,
+                roughness: 1.0,
+                metalness: 0.0,
+                clearcoat: 0.5, // Start at 5/10
+                clearcoatMap: clearcoatTexture, // No clearcoat on leather
+                clearcoatRoughness: 0.02,
+                reflectivity: 1.0,
+                ior: 1.5,
+                envMapIntensity: 0.5, // Start at 5/10
+                sheen: 0,
+                // Normal map for 3D leather texture
+                normalMap: normalTexture,
+                normalScale: new THREE.Vector2(LEATHER_CONFIG.normalScaleX, LEATHER_CONFIG.normalScaleY),
+              });
+              leatherMaterialRef = newMat; // Store reference for slider
+              console.log("[Material] Created LEATHER material with normal map for:", mat.name);
             } else {
               newMat = createStandardMaterial(tex, m.color);
               console.log("[Material] Created STANDARD material for:", mat.name);
@@ -1339,7 +1301,7 @@ async function redrawImage() {
       // Each layer has its own fitMode: "stretch" for base textures, "contain" for overlays
       const layerFitMode = layer.fitMode || "contain";
 
-      // Calculate rectangle region in canvas pixels from actual UV bounds
+      // Calculate rectangle region in canvas pixels from UV bounds
       // In canvas coordinates, V is flipped: V=1 is at top (y=0), V=0 is at bottom (y=height)
       const rectX = uvBounds.minU * canvas.width;
       const rectY = (1 - uvBounds.maxV) * canvas.height; // V=1.0 -> y=0
@@ -1365,7 +1327,7 @@ async function redrawImage() {
       ctx.save();
 
       // For "stretch" mode (Surface layer), draw to FULL canvas - surface.jpg covers entire UV layout
-      // For other modes (overlay layers), clip to UV bounds region only
+      // For leather layers or other overlay layers, clip to target region
       if (layerFitMode !== "stretch") {
         ctx.beginPath();
         ctx.rect(rectX, rectY, rectW, rectH);
@@ -1547,25 +1509,72 @@ async function redrawImage() {
 
     console.log("[redrawImage] Created texture for material:", mat.name, "canvas size:", canvas.width, "x", canvas.height);
 
-    // ===== TẠO MATERIAL DỰA TRÊN LOẠI SẢN PHẨM =====
-    let textureMaps = null;
+    // Create roughness, clearcoat, and normal maps for leather products
+    let roughnessTexture = null;
+    let clearcoatTexture = null;
+    let normalTexture = null;
     if (isLeatherProduct()) {
-      textureMaps = createLeatherTextureMaps(canvas.width, canvas.height);
-      createdTextures.push(textureMaps.roughnessTexture);
-      createdTextures.push(textureMaps.clearcoatTexture);
-      createdTextures.push(textureMaps.normalTexture);
+      // Roughness map: leather=matte, lacquer=glossy
+      const roughnessCanvas = createLeatherRoughnessMap(canvas.width, canvas.height);
+      roughnessTexture = new THREE.CanvasTexture(roughnessCanvas);
+      roughnessTexture.colorSpace = THREE.LinearSRGBColorSpace;
+      roughnessTexture.wrapS = THREE.RepeatWrapping;
+      roughnessTexture.wrapT = THREE.ClampToEdgeWrapping;
+      roughnessTexture.flipY = false;
+      roughnessTexture.needsUpdate = true;
+      createdTextures.push(roughnessTexture);
+
+      // Clearcoat map: leather=no clearcoat, lacquer=full clearcoat
+      const clearcoatCanvas = createLeatherClearcoatMap(canvas.width, canvas.height);
+      clearcoatTexture = new THREE.CanvasTexture(clearcoatCanvas);
+      clearcoatTexture.colorSpace = THREE.LinearSRGBColorSpace;
+      clearcoatTexture.wrapS = THREE.RepeatWrapping;
+      clearcoatTexture.wrapT = THREE.ClampToEdgeWrapping;
+      clearcoatTexture.flipY = false;
+      clearcoatTexture.needsUpdate = true;
+      createdTextures.push(clearcoatTexture);
+
+      // Normal map: creates 3D bumpy leather surface effect
+      await loadLeatherNormal(); // Ensure leather normal image is loaded
+      const normalCanvas = createNormalMap(canvas.width, canvas.height);
+      normalTexture = new THREE.CanvasTexture(normalCanvas);
+      normalTexture.colorSpace = THREE.LinearSRGBColorSpace;
+      normalTexture.wrapS = THREE.RepeatWrapping;
+      normalTexture.wrapT = THREE.ClampToEdgeWrapping;
+      normalTexture.flipY = false;
+      normalTexture.needsUpdate = true;
+      createdTextures.push(normalTexture);
     }
 
+    // Apply material
     loadedModel.traverse((child) => {
       if (!child.isMesh) return;
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       mats.forEach((m, idx) => {
         if (m && m.name === mat.name) {
-          // Chọn material dựa trên loại sản phẩm
           let newMat;
-          if (isLeatherProduct() && textureMaps) {
-            newMat = createLeatherMaterial(tex, m.color, textureMaps);
-            console.log("[Material] Created LEATHER material for:", mat.name);
+          if (isLeatherProduct() && roughnessTexture && clearcoatTexture) {
+            // Leather: matte, no clearcoat, dark black with 3D normal bumps
+            // Lacquer: glossy, full clearcoat, reflective
+            newMat = new THREE.MeshPhysicalMaterial({
+              map: tex,
+              color: new THREE.Color(0xffffff), // Show texture as-is
+              roughnessMap: roughnessTexture,
+              roughness: 1.0,
+              metalness: 0.0,
+              clearcoat: 0.5, // Start at 5/10
+              clearcoatMap: clearcoatTexture, // No clearcoat on leather
+              clearcoatRoughness: 0.02,
+              reflectivity: 1.0,
+              ior: 1.5,
+              envMapIntensity: 0.5, // Start at 5/10
+              sheen: 0,
+              // Normal map for 3D leather texture
+              normalMap: normalTexture,
+              normalScale: new THREE.Vector2(LEATHER_CONFIG.normalScaleX, LEATHER_CONFIG.normalScaleY),
+            });
+            leatherMaterialRef = newMat; // Store reference for slider
+            console.log("[Material] Created LEATHER material with normal map for:", mat.name);
           } else {
             newMat = createStandardMaterial(tex, m.color);
             console.log("[Material] Created STANDARD material for:", mat.name);
@@ -1579,7 +1588,7 @@ async function redrawImage() {
         }
       });
     });
-  }); // end perMaterialBounds.forEach
+  } // end perMaterialBounds loop
 }
 
 // ===== UI SLIDERS & STICKY HANDLERS =====
@@ -1723,6 +1732,17 @@ function loadGLBFromURL(urlOrFile) {
         mat.roughness = 0.08; // Very smooth for mirror reflections
         mat.metalness = 0.0; // Non-metallic
 
+        // IMPORTANT: Clear any baked-in normal/bump maps from GLB model
+        // We'll apply our own region-controlled normal map in redrawImage()
+        if (mat.normalMap) {
+          console.log("[Model] Clearing baked-in normalMap from:", mat.name || child.name);
+          mat.normalMap = null;
+        }
+        if (mat.bumpMap) {
+          console.log("[Model] Clearing baked-in bumpMap from:", mat.name || child.name);
+          mat.bumpMap = null;
+        }
+
         // Add clearcoat if material supports it (MeshPhysicalMaterial)
         // If it's MeshStandardMaterial, these properties still work but clearcoat won't
         if (mat.isMeshStandardMaterial) {
@@ -1844,13 +1864,35 @@ function getUrlParams() {
 // Load surface texture - either from Shopify metafield URL or default fallback
 // Surface texture is designed to map 1:1 with the UV layout in Blender
 // No rotation or scaling needed - it should fill the UV space exactly
-function loadDefaultSurface() {
+async function loadDefaultSurface() {
   const { surfaceUrl } = getUrlParams();
 
   // Lấy đường dẫn surface dựa trên loại sản phẩm
   const defaultSurfacePath = getSurfacePath();
   console.log("[Texture] Product surface path:", defaultSurfacePath);
 
+  // For leather products, create mixed surface with leather overlay
+  if (isLeatherProduct() && !surfaceUrl) {
+    try {
+      console.log("[Texture] Creating leather surface...");
+      const leatherCanvas = await createLeatherSurface(defaultSurfacePath, undefined, null, LEATHER_CONFIG.leatherColorHex);
+
+      // Convert canvas to image
+      const img = new Image();
+      img.onload = () => {
+        console.log("[Texture] Leather surface created:", img.width, "x", img.height);
+        surfaceImage = img;
+        surfaceImageLoaded = true;
+        applyTextureWhenReady();
+      };
+      img.src = leatherCanvas.toDataURL("image/jpeg", 0.95);
+      return;
+    } catch (e) {
+      console.error("[Texture] Failed to create leather surface, falling back:", e);
+    }
+  }
+
+  // Standard surface loading
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.onload = () => {
@@ -1917,23 +1959,22 @@ function loadModelAndSurface() {
           mats.forEach((mat, idx) => {
             originalMaterials.set(child.uuid + "_" + idx, mat.clone());
 
-            // Kiểm tra xem có phải rubber material (bumper) không - check cả mesh name
-            if (isLeatherProduct() && isRubberMaterial(mat.name, child.name)) {
-              console.log(`[Rubber] Found rubber: mesh="${child.name}" material="${mat.name}"`);
-              // Sẽ apply rubber material trong redrawImage sau khi load normal maps
-            }
-
-            // Kiểm tra xem có phải top cap material không
-            if (isLeatherProduct() && isTopCapMaterial(mat.name, child.name)) {
-              console.log(`[TopCap] Found top cap: mesh="${child.name}" material="${mat.name}"`);
-              // Sẽ apply top cap logo trong redrawImage sau khi load logo
-            }
-
             // Upgrade existing material properties for mirror-like lacquer finish
             mat.envMap = scene.environment;
             mat.envMapIntensity = 1.5;
             mat.roughness = 0.08;
             mat.metalness = 0.0;
+
+            // IMPORTANT: Clear any baked-in normal/bump maps from GLB model
+            // We'll apply our own region-controlled normal map in redrawImage()
+            if (mat.normalMap) {
+              console.log("[Model] Clearing baked-in normalMap from:", mat.name || child.name);
+              mat.normalMap = null;
+            }
+            if (mat.bumpMap) {
+              console.log("[Model] Clearing baked-in bumpMap from:", mat.name || child.name);
+              mat.bumpMap = null;
+            }
 
             if (mat.isMeshStandardMaterial) {
               mat.clearcoat = 1.0;
@@ -2020,6 +2061,105 @@ function loadModelAndSurface() {
     }
   );
 }
+
+// ===== LEATHER PICKER UI =====
+// Handle leather texture and color selection from UI
+
+/**
+ * Reload leather surface with current LEATHER_CONFIG settings
+ * Called when user changes texture type or color
+ * @param {boolean} reloadNormal - Whether to reload the normal map texture
+ */
+async function reloadLeatherSurface(reloadNormal = false) {
+  if (!isLeatherProduct()) return;
+  
+  console.log("[LeatherPicker] Reloading with:", {
+    texture: LEATHER_CONFIG.activeTexture,
+    color: LEATHER_CONFIG.activeColor,
+    hex: LEATHER_CONFIG.leatherColorHex,
+    normalPath: LEATHER_CONFIG.normalPath,
+    reloadNormal
+  });
+  
+  setStatus("Updating leather...");
+  
+  try {
+    // Reload normal map if texture type changed
+    if (reloadNormal) {
+      await loadLeatherNormal(true); // Force reload
+    }
+    
+    const defaultSurfacePath = getSurfacePath();
+    const leatherCanvas = await createLeatherSurface(defaultSurfacePath, undefined, null, LEATHER_CONFIG.leatherColorHex);
+    
+    const img = new Image();
+    img.onload = () => {
+      console.log("[LeatherPicker] Surface updated:", img.width, "x", img.height);
+      surfaceImage = img;
+      // Force texture update
+      applyTextureWhenReady();
+      setStatus("Leather updated.");
+    };
+    img.src = leatherCanvas.toDataURL("image/jpeg", 0.95);
+  } catch (e) {
+    console.error("[LeatherPicker] Failed to update:", e);
+    setStatus("Error updating leather.");
+  }
+}
+
+// Initialize leather picker UI
+function initLeatherPicker() {
+  const textureSelect = document.getElementById("texture-select");
+  const colorPalette = document.getElementById("color-palette");
+  const surfaceSelect = document.getElementById("surface-select");
+  const pickerPanel = document.getElementById("leather-picker");
+  
+  // Hide picker if not leather product
+  if (!isLeatherProduct() && pickerPanel) {
+    pickerPanel.style.display = "none";
+    return;
+  }
+  
+  // Surface type selector
+  if (surfaceSelect) {
+    surfaceSelect.addEventListener("change", (e) => {
+      setActiveSurface(e.target.value);
+      console.log("[LeatherPicker] Surface changed to:", e.target.value);
+      reloadLeatherSurface(false); // Surface change, no normal reload needed
+    });
+  }
+  
+  // Texture type selector
+  if (textureSelect) {
+    textureSelect.value = LEATHER_CONFIG.activeTexture;
+    textureSelect.addEventListener("change", (e) => {
+      LEATHER_CONFIG.activeTexture = e.target.value;
+      console.log("[LeatherPicker] Texture changed to:", e.target.value);
+      reloadLeatherSurface(true); // Reload with normal map
+    });
+  }
+  
+  // Color palette swatches
+  if (colorPalette) {
+    const swatches = colorPalette.querySelectorAll(".color-swatch");
+    swatches.forEach(swatch => {
+      swatch.addEventListener("click", () => {
+        // Remove active from all
+        swatches.forEach(s => s.classList.remove("active"));
+        // Add active to clicked
+        swatch.classList.add("active");
+        // Update config
+        const colorKey = swatch.dataset.color;
+        LEATHER_CONFIG.activeColor = colorKey;
+        console.log("[LeatherPicker] Color changed to:", colorKey);
+        reloadLeatherSurface(false); // Color only, no normal reload
+      });
+    });
+  }
+}
+
+// Initialize picker after a short delay to ensure DOM is ready
+setTimeout(initLeatherPicker, 100);
 
 // Start loading both in parallel
 loadDefaultSurface();
@@ -2688,3 +2828,13 @@ function finishOrder(url) {
 }
 
 document.getElementById("orderNowBtn").addEventListener("click", orderNow);
+
+// Expose for debugging
+window.isLeatherProduct = isLeatherProduct;
+window.LEATHER_FRAME = LEATHER_FRAME;
+window.LEATHER_CONFIG = LEATHER_CONFIG;
+window.LEATHER_COLOR_PALETTES = LEATHER_COLOR_PALETTES;
+window.LEATHER_TEXTURE_TYPES = LEATHER_TEXTURE_TYPES;
+window.SURFACE_TYPES = SURFACE_TYPES;
+window.setActiveSurface = setActiveSurface;
+window.reloadLeatherSurface = reloadLeatherSurface;

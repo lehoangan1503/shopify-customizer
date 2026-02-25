@@ -568,8 +568,96 @@
           font-size: 11px;
         }
       }
+
+      /* Leather Picker Panel */
+      .leather-picker {
+        position: fixed;
+        top: 15px;
+        right: 15px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 100;
+        padding: 16px;
+        min-width: 200px;
+      }
+      .leather-picker h4 {
+        margin: 0 0 12px 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #333;
+      }
+      .leather-picker label {
+        display: block;
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 6px;
+        font-weight: 500;
+      }
+      .leather-picker select {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        background: #fafafa;
+        cursor: pointer;
+        margin-bottom: 14px;
+      }
+      .leather-picker select:focus {
+        outline: none;
+        border-color: hsl(var(--primary));
+      }
+      .color-palette {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .color-swatch {
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: transform 0.15s, border-color 0.15s;
+        position: relative;
+      }
+      .color-swatch:hover {
+        transform: scale(1.08);
+      }
+      .color-swatch.active {
+        border-color: hsl(var(--primary));
+        box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
+      }
+      .color-swatch::after {
+        content: attr(data-name);
+        position: absolute;
+        bottom: -18px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 9px;
+        color: #666;
+        white-space: nowrap;
+      }
+      .color-palette-wrap {
+        padding-bottom: 20px;
+      }
+
+      @media (max-width: 768px) {
+        .leather-picker {
+          top: auto;
+          bottom: 15px;
+          right: 15px;
+          left: 15px;
+          min-width: auto;
+        }
+        .color-palette {
+          grid-template-columns: repeat(6, 1fr);
+        }
+      }
     </style>
-    <script type="module" crossorigin src="/assets/index-CKb5t4jg.js"></script>
+    <script type="module" crossorigin src="/assets/index-C5t5aBmq.js"></script>
   </head>
 
   <body>
@@ -616,6 +704,38 @@
     <!-- 3D Controls Tips Dialog -->
     <button id="tips-toggle" class="tips-toggle-btn" aria-label="Show 3D controls help">?</button>
     <button id="bg-toggle" class="bg-toggle-btn" aria-label="Toggle background" title="Toggle light/dark background">&#9788;</button>
+
+    <!-- Leather Picker Panel -->
+    <div class="leather-picker" id="leather-picker">
+      <h4>Leather Options</h4>
+      
+      <label for="surface-select">Surface</label>
+      <select id="surface-select">
+        <option value="leather">Leather</option>
+        <option value="leather1">Leather 1</option>
+        <option value="leather6" selected>Leather 6</option>
+        <option value="leather9">Leather 9</option>
+      </select>
+
+      <label for="texture-select">Texture Type</label>
+      <select id="texture-select">
+        <option value="type1">Crocodile</option>
+        <option value="type2">Snake</option>
+      </select>
+
+      <label>Color</label>
+      <div class="color-palette-wrap">
+        <div class="color-palette" id="color-palette">
+          <div class="color-swatch active" data-color="black" data-name="Black" style="background: #1A1A1A;"></div>
+          <div class="color-swatch" data-color="chestnut" data-name="Chestnut" style="background: #954535;"></div>
+          <div class="color-swatch" data-color="chocolate" data-name="Chocolate" style="background: #3D1C02;"></div>
+          <div class="color-swatch" data-color="darkBrown" data-name="Dark Brown" style="background: #2C1608;"></div>
+          <div class="color-swatch" data-color="whiskey" data-name="Whiskey" style="background: #B5651D;"></div>
+          <div class="color-swatch" data-color="tan" data-name="Tan" style="background: #D2B48C;"></div>
+        </div>
+      </div>
+    </div>
+
     <div id="tips-dialog" class="tips-dialog hidden">
       <div class="tips-header">
         <span>3D Controls</span>
@@ -644,7 +764,7 @@
         </ul>
       </div>
     </div>
-
+
     <script>
       // Tips dialog toggle
       const tipsToggle = document.getElementById('tips-toggle');

@@ -3,14 +3,17 @@
  * Cấu hình loại sản phẩm và routing
  */
 
-import { MODEL_CONFIG } from './leather-config.js';
+import { MODEL_CONFIG, getActiveSurfacePath, SURFACE_TYPES, setActiveSurface } from "./leather-config.js";
+
+// Re-export for main.js
+export { SURFACE_TYPES, setActiveSurface, getActiveSurfacePath };
 
 // =====================================================
 // ===== LOẠI SẢN PHẨM =====
 // =====================================================
 export const PRODUCT_TYPES = {
-  STANDARD: 'standard',   // Không có da - bóng như thủy tinh
-  LEATHER: 'leather',     // Có bọc da
+  STANDARD: "standard", // Không có da - bóng như thủy tinh
+  LEATHER: "leather", // Có bọc da
 };
 
 // =====================================================
@@ -18,31 +21,31 @@ export const PRODUCT_TYPES = {
 // =====================================================
 export const PRODUCTS = {
   // Sản phẩm KHÔNG có da
-  'cue-butt': {
+  "cue-butt": {
     type: PRODUCT_TYPES.STANDARD,
-    glbPath: './cue-butt.glb',
-    name: 'Cue Butt Standard',
-    description: 'Gậy bi-a không bọc da',
+    glbPath: "./cue-butt.glb",
+    name: "Cue Butt Standard",
+    description: "Gậy bi-a không bọc da",
   },
-  'cue-butt-smooth': {
+  "cue-butt-smooth": {
     type: PRODUCT_TYPES.STANDARD,
-    glbPath: './cue-butt-smooth.glb',
-    name: 'Cue Butt Smooth',
-    description: 'Gậy bi-a mặt nhẵn',
+    glbPath: "./cue-butt-smooth.glb",
+    name: "Cue Butt Smooth",
+    description: "Gậy bi-a mặt nhẵn",
   },
-  
+
   // Sản phẩm CÓ da - GLB path từ leather-config.js
-  'cue-leather': {
+  "cue-leather": {
     type: PRODUCT_TYPES.LEATHER,
-    glbPath: MODEL_CONFIG.glbPath,  // Từ leather-config.js
-    name: 'Cue Butt Leather',
-    description: 'Gậy bi-a có bọc da',
+    glbPath: MODEL_CONFIG.glbPath, // Từ leather-config.js
+    name: "Cue Butt Leather",
+    description: "Gậy bi-a có bọc da",
   },
-  'cue-croc': {
+  "cue-croc": {
     type: PRODUCT_TYPES.LEATHER,
-    glbPath: MODEL_CONFIG.glbPath,  // Từ leather-config.js
-    name: 'Cue Butt Crocodile',
-    description: 'Gậy bi-a bọc da cá sấu',
+    glbPath: MODEL_CONFIG.glbPath, // Từ leather-config.js
+    name: "Cue Butt Crocodile",
+    description: "Gậy bi-a bọc da cá sấu",
   },
 };
 
@@ -57,7 +60,7 @@ export const PRODUCTS = {
  */
 export function getProductIdFromURL() {
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('product') || 'cue-butt';
+  return urlParams.get("product") || "cue-butt";
 }
 
 /**
@@ -67,7 +70,7 @@ export function getProductIdFromURL() {
  */
 export function getProductTypeFromURL() {
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('type') || null;
+  return urlParams.get("type") || null;
 }
 
 /**
@@ -77,20 +80,20 @@ export function getProductTypeFromURL() {
 export function getCurrentProduct() {
   const productId = getProductIdFromURL();
   const typeOverride = getProductTypeFromURL();
-  
+
   // Lấy từ danh sách sản phẩm
-  let product = PRODUCTS[productId] || PRODUCTS['cue-butt'];
-  
+  let product = PRODUCTS[productId] || PRODUCTS["cue-butt"];
+
   // Cho phép override type qua URL
   if (typeOverride && Object.values(PRODUCT_TYPES).includes(typeOverride)) {
     product = { ...product, type: typeOverride };
-    
+
     // Nếu override thành leather, dùng GLB từ leather-config
     if (typeOverride === PRODUCT_TYPES.LEATHER) {
       product.glbPath = MODEL_CONFIG.glbPath;
     }
   }
-  
+
   return {
     id: productId,
     ...product,
@@ -121,8 +124,8 @@ export function getProductGLBPath() {
  */
 export function getSurfacePath() {
   if (isLeatherProduct()) {
-    // Leather dùng surface riêng từ config
-    return MODEL_CONFIG.surfacePath || MODEL_CONFIG.fallbackSurfacePath || "./surface.jpg";
+    // Leather uses dynamic surface from config
+    return getActiveSurfacePath();
   }
   // Standard dùng surface mặc định
   return "./surface.jpg";
@@ -139,7 +142,7 @@ export function getSurfacePath() {
  */
 export function createProductURL(productId) {
   const url = new URL(window.location.href);
-  url.searchParams.set('product', productId);
+  url.searchParams.set("product", productId);
   return url.toString();
 }
 
@@ -148,12 +151,11 @@ export function createProductURL(productId) {
  */
 export function logCurrentProduct() {
   const product = getCurrentProduct();
-  console.log('='.repeat(50));
-  console.log('[Product] Current product:', product.id);
-  console.log('[Product] Type:', product.type);
-  console.log('[Product] Name:', product.name);
-  console.log('[Product] GLB:', product.glbPath);
-  console.log('[Product] Has Leather:', product.type === PRODUCT_TYPES.LEATHER);
-  console.log('='.repeat(50));
+  console.log("=".repeat(50));
+  console.log("[Product] Current product:", product.id);
+  console.log("[Product] Type:", product.type);
+  console.log("[Product] Name:", product.name);
+  console.log("[Product] GLB:", product.glbPath);
+  console.log("[Product] Has Leather:", product.type === PRODUCT_TYPES.LEATHER);
+  console.log("=".repeat(50));
 }
-
